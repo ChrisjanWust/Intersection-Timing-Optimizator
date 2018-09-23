@@ -1,20 +1,23 @@
 import pygame
 
 SCALE = 2
-WINDOW_HEIGHT = 800
-WINDOW_WIDTH = 1400
+WINDOW_HEIGHT = 600
+WINDOW_WIDTH = 1200
 CAR_LENGTH = 5
 CAR_WIDTH = 2
 ROAD_COLOR = (150,150,150)
 CAR_COLOR = (0, 0, 230)
 ROAD_WIDTH = 6
 
-TIME_TEXT_SIZE = 48
+TIME_TEXT_SIZE = 36
 
 FIRST_INTERSECTION_INDEX = 0
-FIRST_INTERSECTION_X = 200
-FIRST_INTERSECTION_Y = 200
+FIRST_INTERSECTION_X = 120
+FIRST_INTERSECTION_Y = 120
 
+FRAME_BY_FRAME = False
+IGNORE_FPS = False
+DEBUG_PRINT_ON = False
 
 #           DIRECTIONS
 #
@@ -32,7 +35,7 @@ class Display:
         self.intersections = []
         self.links = []
 
-        self.window = pygame.display.set_mode((1200, 1000))
+        self.window = None
         self.fps = 10
         self.clock = pygame.time.Clock()
 
@@ -42,7 +45,8 @@ class Display:
         self.linksDirections = [None] * len(
             self.links)  # similar to linksCoordinates, but stores the direction of the link (0 = vertical, 1 = horizontal) # could merge these two link metadata arrays, but oh well
         self.unexploredIntersections = []  # deprecating
-        # self.font = pygame.font.SysFont("bahnschrift", TIME_TEXT_SIZE)
+        self.font = None
+        #self.font = pygame.font.SysFont("bahnschrift", TIME_TEXT_SIZE)
 
 
 
@@ -50,7 +54,7 @@ class Display:
         self.intersections = intersections
         self.links = links
 
-        self.window = pygame.display.set_mode((1200, 1000))
+        self.window = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
         self.fps = fps
         self.clock = pygame.time.Clock()
 
@@ -64,7 +68,7 @@ class Display:
 
 
         pygame.init()
-
+        self.font = pygame.font.SysFont("bahnschrift", TIME_TEXT_SIZE)
 
 
         self.mapNetwork()
@@ -83,7 +87,6 @@ class Display:
             directionToLane = (direction - 1 + 4) % 4
             frontOfCar = self.directionalAdd(directionToLane, frontOfCar, ROAD_WIDTH / 4)
 
-
             backOfCar = self.directionalAdd(direction, frontOfCar, - CAR_LENGTH)
             pygame.draw.line(self.window, CAR_COLOR, self.scaleList(frontOfCar), self.scaleList(backOfCar), SCALE * CAR_WIDTH)
 
@@ -91,13 +94,13 @@ class Display:
         for linkIndex in range(len(self.links)):
             point1 = self.directionalAdd(self.linksDirections[linkIndex], self.linksCoordinates[linkIndex], self.links[linkIndex].getDistance()/2)
             point2 = self.directionalAdd(self.oppositeDirection(self.linksDirections[linkIndex]), self.linksCoordinates[linkIndex], self.links[linkIndex].getDistance()/2)
-            # print("Drawing line from", point1, "to", point2)
             pygame.draw.line(self.window, ROAD_COLOR, self.scaleList(point1), self.scaleList(point2), ROAD_WIDTH * SCALE)
 
 
     def drawTime(self, time):
         text = self.font.render(str(time), True, (200, 200, 200))
-        self.window.blit(text, (WINDOW_HEIGHT - TIME_TEXT_SIZE - 30, WINDOW_WIDTH - 150))
+        self.window.blit(text, (WINDOW_WIDTH - 100, 30))
+        #self.window.blit(text, (100,100))
 
 
     def exploreIntersection(self, intersectionIndex, intersectionCoordinates):
@@ -143,7 +146,7 @@ class Display:
 
     def mapNetwork(self):
         self.exploreIntersection(FIRST_INTERSECTION_INDEX, [FIRST_INTERSECTION_X, FIRST_INTERSECTION_Y])
-        print(self.linksCoordinates)
+        self.printDebug(self.linksCoordinates)
 
 
     def oppositeDirection (self, direction):
@@ -165,13 +168,19 @@ class Display:
 
         self.drawNetwork()
         self.drawCars(cars)
-        # self.drawTime(time)
+        self.drawTime(time)
 
-        self.clock.tick(self.fps)
+        if FRAME_BY_FRAME:
+            self.waitTillKey(pygame.K_RIGHT)
+        elif not IGNORE_FPS:
+            self.clock.tick(self.fps)
+
         pygame.display.update()
 
 
-    def runTillExit(self):
+
+
+    def waitTillKey(self, key = pygame.K_ESCAPE):
         running = True
         while running:
             # for loop through the event queue
@@ -179,9 +188,14 @@ class Display:
                 # Check for KEYDOWN event; KEYDOWN is a constant defined in pygame.locals, which we imported earlier
                 if event.type == pygame.KEYDOWN:
                     # If the Esc key has been pressed set running to false to exit the main loop
-                    if event.key == pygame.K_ESCAPE:
+                    if event.key == key:
                         running = False
-                # Check for QUIT event; if QUIT, set running to false
-                elif event.type == pygame.QUIT:
-                    running = False
+
+        self.printDebug("\n------- Key pressed - waiting over -------\n")
+
+    def printDebug(self, *arg):
+        if DEBUG_PRINT_ON:
+            for msg in arg:
+                print(msg, end='')
+
 

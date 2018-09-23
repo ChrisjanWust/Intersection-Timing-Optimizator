@@ -19,7 +19,7 @@ display.update([Car(1, 1, 6, 3, distanceInLink=1), Car(0, 0, 9, 2, distanceInLin
 
 display.update([Car(1, 1, 6, 3, distanceInLink=4), Car(0, 0, 9, 2, distanceInLink=1)])
 
-display.runTillExit()
+display.waitTillKey()
 
 
 

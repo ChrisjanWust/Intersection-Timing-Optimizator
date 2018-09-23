@@ -6,6 +6,7 @@
 
 
 SPEED_LIMIT = 15 # upper speed limit (m/s)
+TARGET_SPEED = 12
 MAX_DECELERATION = 2.5 # (m/s^2)
 ACCELERATION = 0.9 # (m/s^2)
 TIME_STEP = 0.1 # (s)
@@ -37,7 +38,7 @@ class Car:
         self.timeEntered = timeEntered
 
         
-    def move(self, nextStop):
+    def move(self, nextStop): #deprecating
         # need a lot of modification; for starters, should consider accelleration
         self.distanceInLink += 0.1 * self.speed
         
@@ -61,7 +62,10 @@ class Car:
     def move2(self, distanceTillNextObject, speedOfNextObject):
         oldSpeed = self.speed
 
-        self.printDebug('\tmove2: dx: ', round(distanceTillNextObject,2), 'm  \tv2: ',  round(speedOfNextObject,2), 'm/s')
+        if (distanceTillNextObject < 0):
+            self.printDebug('distanceTillNextObject smaller than 0!! It is:', distanceTillNextObject)
+
+        # self.printDebug('\tmove2: dx: ', round(distanceTillNextObject,2), 'm  \tv2: ',  round(speedOfNextObject,2), 'm/s')
         if (distanceTillNextObject >= START_BREAKING_DISTANCE or self.speed < speedOfNextObject): # accelerate
             if(self.speed < SPEED_LIMIT):
                 self.speed = self.speed + ACCELERATION * TIME_STEP
@@ -71,15 +75,46 @@ class Car:
                 #        START_BREAKING_DISTANCE - distanceTillNextObject) / START_BREAKING_DISTANCE / START_BREAKING_DISTANCE * 1.3 + self.speed / SPEED_LIMIT * self.speed / SPEED_LIMIT * 1.43) * MAX_DECELERATION * TIME_STEP
 
                 # new deceleration based on first principles / equation of motion
-                deceleration = - (speedOfNextObject * speedOfNextObject - self.speed * self.speed) / ( 2 * (distanceTillNextObject))
-                self.printDebug('  \tdecelerating at ', round(deceleration,2), 'm/s2')
+                if distanceTillNextObject != 0:
+                    deceleration = - (speedOfNextObject * speedOfNextObject - self.speed * self.speed) / ( 2 * (distanceTillNextObject))
+                else:
+                    deceleration = MAX_DECELERATION
+                # self.printDebug('  \tdecelerating at ', round(deceleration,2), 'm/s2')
 
-                if (deceleration > MAX_DECELERATION): # can remove this test later?
+                # if (deceleration > MAX_DECELERATION): # can remove this test later?
                     # deceleration = MAX_DECELERATION # deceleration should actually be limited, but not for now
-                    self.printDebug('  \tdecelerating above max')
+                    # self.printDebug('  \tdecelerating above max')
                 self.speed = self.speed - deceleration * TIME_STEP
                 if self.speed < 0:
                     self.speed = 0
+
+        self.distanceInLink += TIME_STEP * (self.speed + oldSpeed) / 2
+
+        return self.distanceInLink
+
+    def move3(self, distanceTillNextObject, speedOfNextObject):
+        oldSpeed = self.speed
+
+
+        if (distanceTillNextObject < 0):
+            self.printDebug('distanceTillNextObject smaller than 0!! It is:', distanceTillNextObject)
+
+        K_distance = 2
+        K_acceleration = 1
+        d_ref_nom = AVERAGE_FOLLOWING_DISTANCE * oldSpeed
+        delta_d = distanceTillNextObject - d_ref_nom
+
+        V_ref_nom = TARGET_SPEED
+        V_ref = V_ref_nom + K_distance * delta_d
+        a = K_acceleration * (V_ref - oldSpeed)
+        self.speed = oldSpeed + a * TIME_STEP
+
+
+        # limiting
+        if self.speed < 0: # limit moet hoer as nul - gaan neig na 0, maar nooit 0 wees nie
+            self.speed = 0
+        if self.speed > SPEED_LIMIT:
+            self.speed = SPEED_LIMIT
 
         self.distanceInLink += TIME_STEP * (self.speed + oldSpeed) / 2
 

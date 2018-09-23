@@ -5,6 +5,7 @@
 from car import Car
 import numpy as np
 
+DEBUG_PRINT_ON = False
 
 class Entry:
 
@@ -21,7 +22,11 @@ class Entry:
         return None
 
     def possiblyGenerateCar2(self, TIME_STEP):
-        self.queue += np.random.poisson(TIME_STEP * 3600 / self.vehiclesPerHour)
+        lamda = TIME_STEP * self.vehiclesPerHour / 3600
+        numberOfCarsAdded = np.random.poisson(lamda)
+        self.queue += numberOfCarsAdded
+
+        self.printDebug("# generated:", numberOfCarsAdded)
 
     def possiblyGetCar(self):
         if self.queue > 0:
@@ -29,8 +34,22 @@ class Entry:
             return Car(self.link, self.direction, 10, self.destinations[0])
         return None
 
+    def hasCarAvailable(self):
+        if self.queue > 0:
+            return True
+        return False
+
     def getLink(self):
         return self.link
+
+    def getDirection(self):
+        return self.direction
+
+    def printDebug(self, *arg):
+        if DEBUG_PRINT_ON:
+            for msg in arg:
+                print(msg, end='')
+
 
 
 
