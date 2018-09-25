@@ -6,6 +6,7 @@ from scenario import Scenario
 import time as time_lib
 from timer import Timer
 from display import Display
+from listGenerator import ListGenerator
 
 
 
@@ -21,7 +22,7 @@ CAR_LENGTH = 6
 MIN_CAR_LENGTH_BETWEEN_CARS = 1.5
 
 
-SCENARIO_NUMBER = 2
+SCENARIO_NUMBER: int = 2
 SIMULATIONS_PER_CHANGE = 1
 POINTS_SIMULATED = 9
 SPEED_IN_KMPERHOUR = True
@@ -38,11 +39,11 @@ MEASURING_PERIOD = 60 * 5 # (s)
 # debugging
 DEBUG_PRINT_ON = True
 DEBUG_PRINT_ONLY_SELECTED = True
-DISPLAY_ON = False
+DISPLAY_ON = True
 
 
 # initialize public variables
-cars = []
+cars = [[[]]]
 links = []
 intersections = []
 entries = []
@@ -52,6 +53,7 @@ systemTimeTravelled = 0
 meanSystemSpeedLog = [-1.0] * int(MEAN_SYSTEM_SPEED_CONSISTENCY_PERIOD / CHECK_MEAN_SYSTEM_SPEED_TIMESTEP)
 display = Display()
 timer = Timer()
+listGenerator = ListGenerator()
 measuringStarted = 0 # (s) = time measuring was started
 previousProcessingTimestamp = 0
 
@@ -78,8 +80,8 @@ def resetSimulation():
     global measuringStarted
 
     current_scenario = Scenario.loadScenario(SCENARIO_NUMBER)
-    cars = current_scenario['cars']
     links = current_scenario['links']
+    cars = listGenerator.threeD(len(links), 4, 0)
     intersections = current_scenario['intersections']
     entries = current_scenario['entries']
 
@@ -105,16 +107,6 @@ def printDebug(*arg, selected = 'NO'):
         for msg in arg:
             print (msg, end='')
 
-
-def generateNewCars():
-    global entries
-    global time
-
-    for entry in entries:
-        possibleNewCar = entry.possiblyGenerateCar(time)
-        if possibleNewCar:
-            cars.append(possibleNewCar)
-
 def runSingleTimestep():
     global cars
     global links
@@ -126,82 +118,107 @@ def runSingleTimestep():
 
     allHasReachedDestination = True
 
-    carsToBeRemoved = []
+    carsToBeRemoved = listGenerator.twoD(len(links), 4, 0)
+    carsToBeAdded = listGenerator.threeD(len(links), 4, 0)
 
-    generateNewCars2()
+    generateNewCars()
 
-    for i in range(len(cars)):
+    printDebug("\nCars: " + str(cars))
 
-        currentLink, distanceInLink, speed, direction = cars[
-            i].getPositionAndSpeed()  # could get this with separate get methods
+    for l in range(len(links)):
+        for d in range(4):
+            i = 0
+            for car in cars[l][d]:
+                currentLink, distanceInLink, speed, direction = car.getPositionAndSpeed()  # todo: should no longer return link or direction
 
-        printDebug("\n", round(time, 1), "s  ", "\tcar: ", i,
-                   "\tcurrentLink: ", currentLink,
-                   "\tdistanceInLink: ", round(distanceInLink, 2),
-                   " \tspeed: ", speedToString(speed))
+                printDebug("\n", time, "s  ",
+                           "\tcar", car,
+                           "\tcurrentLink: ", currentLink,
+                           "\tdistanceInLink: ", round(distanceInLink, 2),
+                           " \tspeed: ", speedToString(speed))
 
-        if not cars[i].hasReachedDestination():  # before doing calculations, check if car has already reached destination # should rather delete cars that has reached destination
+                if not car.hasReachedDestination():  # before doing calculations, check if car has already reached destination # todo: should rather delete cars that has reached destination
 
-            allHasReachedDestination = False
+                    allHasReachedDestination = False
 
-            # FINDING CLOSEST OBJECT (can be an intersection or car)
+                    # FINDING CLOSEST OBJECT (can be an intersection or car)
+                    nextObjectDistance, nextObjectSpeed = findNextObstacle2(currentLink, distanceInLink, direction, i, l, d)
 
-            nextObject_distance, nextObject_speed = findNextObstacle(currentLink, distanceInLink, direction)
+                    # move
+                    distanceInLink = car.move2(nextObjectDistance, nextObjectSpeed)
+
+                    # routing
+                    if (distanceInLink > links[currentLink].getDistance()):
+                        if (links[currentLink].getIntersection(direction) != -1):  # change to another link
+                            car.addDistanceTravelled(links[currentLink].getDistance())
+                            newLinkIndex = intersections[links[currentLink].getIntersection(direction)].getLink(direction)
+                            car.changeLink(
+                                newLinkIndex,
+                                distanceInLink - links[currentLink].getDistance(), direction)
+                            carsToBeRemoved[l][d] += 1
+                            # carsToBeAdded[newLinkIndex].append(car)
+                            carsToBeAdded[newLinkIndex][d] =[car] # todo:  change to +=[car]
+                            printDebug('\nAppending car to carsToBeAdded at link ', newLinkIndex, "\ncarsToBeAdded: ", str(carsToBeAdded), "\n")
+                            printDebug('carsToBeRemoved: ', str(carsToBeRemoved), '\n')
+                            # print('Changing to  link', intersections[links[currentLink].getIntersection(direction)].getLink(direction), 'from intersection', links[currentLink].getIntersection(direction), end='')
+                        else:  # car has reached destination
+                            car.addDistanceTravelled(distanceInLink)
+                            car.changeLink(-1, distanceInLink - links[currentLink].getDistance(), direction)
+                            systemDistanceTravelled += car.getDistanceTravelled()
+                            systemTimeTravelled += car.getTimeTravelled(
+                                time + TIME_STEP)  # by this stage, move has already been executed
+                            carsToBeRemoved[l][d] += 1
+                            printDebug('\ncarsToBeRemoved: ', str(carsToBeRemoved), '\n')
 
 
-            # move
-            distanceInLink = cars[i].move2(nextObject_distance, nextObject_speed)
+                else:
+                    printDebug("  \talready arrived")
+
+                i =+ 1
 
 
-
-            # routing
-            if (distanceInLink > links[currentLink].getDistance()):
-                if (links[currentLink].getIntersection(direction) != -1): # change to another link
-                    cars[i].addDistanceTravelled(links[currentLink].getDistance())
-                    cars[i].changeLink(intersections[links[currentLink].getIntersection(direction)].getLink(direction),
-                                       distanceInLink - links[currentLink].getDistance(), direction)
-                    # print('Changing to  link', intersections[links[currentLink].getIntersection(direction)].getLink(direction), 'from intersection', links[currentLink].getIntersection(direction), end='')
-                else: # car has reached destination
-                    cars[i].addDistanceTravelled(distanceInLink)
-                    cars[i].changeLink(-1,distanceInLink - links[currentLink].getDistance(), direction)
-                    systemDistanceTravelled += cars[i].getDistanceTravelled()
-                    systemTimeTravelled += cars[i].getTimeTravelled(time + TIME_STEP) # by this stage, move has already been executed
-                    carsToBeRemoved.append(i)
-
-        else:
-            printDebug("  \talready arrived")
-
-
-    carsToBeRemoved.sort(reverse=True)
-    for i in carsToBeRemoved:
-        cars.pop(i)
+    removeCars(carsToBeRemoved)
+    addReroutedCars(carsToBeAdded)
 
     if DISPLAY_ON:
         display.update(cars, time)
 
     continueSimulation = True
-    if round(time,1) % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
+    if time % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
         continueSimulation = checkMeanSystemSpeed()
 
     time = round(time + TIME_STEP, 1)
 
     return continueSimulation
 
-def generateNewCars():
-    for entry in entries:
-        possibleCar = entry.possiblyGenerateCar(time)
-        if possibleCar:
-            cars.append(possibleCar)
+def removeCars(carsToBeRemoved):
+    for l in range(len(links)):
+        for d in range(4):
+            for i in range(carsToBeRemoved[l][d]):
+                printDebug('\nCar being removed from link ', l)
+                printDebug('\ncarsToBeRemoved: ', str(carsToBeRemoved), '\n')
+                cars[l][d].pop(0)
 
-def generateNewCars2():
+def addReroutedCars(carsToBeAdded):
+    for l in range(len(links)):
+        for d in range(4):
+            for car in carsToBeAdded[l][d]:
+                cars[l][d].append(car)
+                printDebug('\ncarsToBeAdded', str(carsToBeAdded), '\nCar added to link ', l, '\n')
+
+
+def generateNewCars():
     for entry in entries:
         entry.possiblyGenerateCar2(TIME_STEP)
 
         if entry.hasCarAvailable(): # don't want to spend time on looping through all cars when unnecessary
-            distanceTillNextCar = findNextObstacle(entry.getLink(), 0, entry.getDirection())[0]
+            linkIndex = entry.getLink()
+            direction = entry.getDirection()
+            distanceTillNextCar = findNextObstacle2(linkIndex, 0, direction, len(cars[linkIndex][direction]))[0]
             if distanceTillNextCar > 0:
-                cars.append(entry.possiblyGetCar()) # there will definitely be a car since this is in "if entry.hasCarAvailable"
-
+                newCar = entry.possiblyGetCar() # there will definitely be a car since this is in "if entry.hasCarAvailable"
+                cars[linkIndex][direction].append(newCar)
+                printDebug('\nNew car generated at index', linkIndex, '\n')
 
 
 def findNextObstacle(linkIndex, distanceInLink, direction):
@@ -210,6 +227,7 @@ def findNextObstacle(linkIndex, distanceInLink, direction):
     nextObjectSpeed = SPEED_LIMIT
 
     nextIntersectionIndex = links[linkIndex].getIntersection(direction)
+
     if nextIntersectionIndex != -1:
         nextObjectDistance = links[linkIndex].getDistance() - distanceInLink - STOP_DISTANCE_FROM_LINE
         if intersections[nextIntersectionIndex].getStatus(time, direction) == 'GREEN':
@@ -217,10 +235,8 @@ def findNextObstacle(linkIndex, distanceInLink, direction):
         else:
             nextObjectSpeed = 0
 
-    # todo: initialize with intersection details
-
-    for car in cars:
-        carLinkIndex, carDistanceInLink, carSpeed, carDirection = car.getPositionAndSpeed()
+    for i in range(1,len(cars[linkIndex])): # should just be testing for the next car at index -1
+        carLinkIndex, carDistanceInLink, carSpeed, carDirection = cars[linkIndex][i].getPositionAndSpeed()
 
         # statements can be combined, but keep for now for readability
         if carLinkIndex == linkIndex and direction == carDirection:
@@ -228,6 +244,32 @@ def findNextObstacle(linkIndex, distanceInLink, direction):
                 if carDistanceInLink - distanceInLink - MIN_CAR_LENGTH_BETWEEN_CARS * CAR_LENGTH < nextObjectDistance:
                     nextObjectDistance = carDistanceInLink - distanceInLink - CAR_LENGTH * MIN_CAR_LENGTH_BETWEEN_CARS
                     nextObjectSpeed = carSpeed
+
+    return nextObjectDistance, nextObjectSpeed
+
+
+def findNextObstacle2(linkIndex, distanceInLink, direction, i, l = None, d = None):
+    # initialize with maximum - this would remain unchanged only if the car is heading towards an exit and has no other cars in front of it
+    nextObjectDistance = 999
+    nextObjectSpeed = SPEED_LIMIT
+
+    if i == 0:
+        nextIntersectionIndex = links[linkIndex].getIntersection(direction)
+
+        if nextIntersectionIndex != -1:
+            nextObjectDistance = links[linkIndex].getDistance() - distanceInLink - STOP_DISTANCE_FROM_LINE
+            if intersections[nextIntersectionIndex].getStatus(time, direction) == 'GREEN':
+                nextObjectSpeed = INTERSECTION_SPEED
+            else:
+                nextObjectSpeed = 0
+    else:
+        try:
+            carLinkIndex, carDistanceInLink, carSpeed, carDirection = cars[linkIndex][direction][i-1].getPositionAndSpeed()
+
+            nextObjectDistance = carDistanceInLink - distanceInLink - CAR_LENGTH * MIN_CAR_LENGTH_BETWEEN_CARS
+            nextObjectSpeed = carSpeed
+        except (IndexError):
+            print("---------INDEXERROR:---------\nlinkIndex: ", linkIndex, "\ndirection: ", direction , "\ni: ", i, "\nTime:", time, "\ncars:", cars, "\ncars[l]:", cars[linkIndex], "\nd: ", d, "\nl:", l, "\ndistanceInLink:", distanceInLink, "\n-----------------------------")
 
     return nextObjectDistance, nextObjectSpeed
 

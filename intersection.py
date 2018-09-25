@@ -45,3 +45,6 @@ class Intersection:
         if DEBUG_PRINT_ON:
             for msg in arg:
                 print(msg, end='')
+
+    def getCar(self):
+        return self

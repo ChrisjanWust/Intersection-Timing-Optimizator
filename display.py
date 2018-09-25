@@ -16,7 +16,7 @@ FIRST_INTERSECTION_X = 120
 FIRST_INTERSECTION_Y = 120
 
 FRAME_BY_FRAME = False
-IGNORE_FPS = False
+IGNORE_FPS = True
 DEBUG_PRINT_ON = False
 
 #           DIRECTIONS
@@ -77,18 +77,20 @@ class Display:
 
 
     def drawCars(self, cars):
-        for car in cars:
-            linkIndex, distanceInLink, speed, direction = car.getPositionAndSpeed()
-            linkDistance = self.links[linkIndex].getDistance()
-            linkCoordinates = self.linksCoordinates[linkIndex]
-            frontOfCar = self.directionalAdd(direction, linkCoordinates, distanceInLink - linkDistance / 2)
+        for l in range(len(self.links)):
+            for d in range(4): # 4 directions
+                for car in cars[l][d]:
+                    linkIndex, distanceInLink, speed, direction = car.getPositionAndSpeed()
+                    linkDistance = self.links[linkIndex].getDistance()
+                    linkCoordinates = self.linksCoordinates[linkIndex]
+                    frontOfCar = self.directionalAdd(direction, linkCoordinates, distanceInLink - linkDistance / 2)
 
-            # change coordinate for specific lane
-            directionToLane = (direction - 1 + 4) % 4
-            frontOfCar = self.directionalAdd(directionToLane, frontOfCar, ROAD_WIDTH / 4)
+                    # change coordinate for specific lane
+                    directionToLane = (direction - 1 + 4) % 4
+                    frontOfCar = self.directionalAdd(directionToLane, frontOfCar, ROAD_WIDTH / 4)
 
-            backOfCar = self.directionalAdd(direction, frontOfCar, - CAR_LENGTH)
-            pygame.draw.line(self.window, CAR_COLOR, self.scaleList(frontOfCar), self.scaleList(backOfCar), SCALE * CAR_WIDTH)
+                    backOfCar = self.directionalAdd(direction, frontOfCar, - CAR_LENGTH)
+                    pygame.draw.line(self.window, CAR_COLOR, self.scaleList(frontOfCar), self.scaleList(backOfCar), SCALE * CAR_WIDTH)
 
     def drawNetwork(self):
         for linkIndex in range(len(self.links)):
@@ -128,10 +130,10 @@ class Display:
     def getNextUnexploredLink(self, intersectionIndex, direction):
         direction +=1
         if (direction != 4):
-            if self.linksCoordinates[self.intersections[intersectionIndex].getLink(direction)]:
+            if self.linksCoordinates[self.intersections[intersectionIndex].getCurrentLinkIndex(direction)]:
                 self.getNextUnexploredLink(intersectionIndex, direction + 1)
             else:
-                return self.intersections[intersectionIndex].getLink(direction)
+                return self.intersections[intersectionIndex].getCurrentLinkIndex(direction)
         else:
             # no unexplored link in the intersection
             return -1

@@ -11,7 +11,7 @@ from entry import Entry
 class Scenario:
 
 
-    def loadScenario(scenario_nr):
+    def loadScenario(scenario_nr: int):
         scenarios = [
 
 
@@ -46,7 +46,7 @@ class Scenario:
                 'links': [Link(40, [0, -1, -1, -1]), Link(100, [-1, 0, -1, -1]), Link(50, [-1, -1, 0, -1]),
                         Link(120, [-1, -1, -1, 0])],
                 'intersections': [Intersection([2, 3, 0, 1])],
-                'cars': [Car(1, 1, 6, 2)],
+                'cars': [[],[],[],[]],
                 'entries': [Entry(0, 0, 300, [2]), Entry(2, 2, 50, [0]), Entry(1, 1, 300, [3]), Entry(3, 3, 90, [1])]
 
             },
@@ -68,14 +68,14 @@ class Scenario:
                          Link(70, [-1, 2, -1, 1]),
                          Link(40, [2, -1, 5, -1]),
                          Link(60, [-1, -1, 2, -1]),
-                         Link(90, [-1, -1, 2, -1]),
+                         Link(40, [-1, -1, 2, -1]),
                          Link(80, [3, -1, -1, -1]),
                          Link(100, [-1, 3, -1, -1]),
                          Link(120, [-1, 4, -1, 3]),
                          Link(80, [4, -1, -1, -1]),
                          Link(70, [-1, 5, -1, 4]),
                          Link(80, [5, -1, -1, -1]),
-                         Link(90, [-1, -1, -1, 5])],
+                         Link(150, [-1, -1, -1, 5])],
 
 
                 'intersections':  [Intersection([2, 3, 0, 1]),

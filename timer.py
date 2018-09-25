@@ -24,7 +24,7 @@ class Timer:
         averageTime = (currentTimestamp - self.startupTime) / nrRuns
         self.printDebug("Average processing time: ", averageTime, 's\n', selected='YES')
 
-    def printDebug(*arg, selected='NO'):
+    def printDebug(self, *arg, selected='NO'):
         if DEBUG_PRINT_ON and ((not DEBUG_PRINT_ONLY_SELECTED) or selected == 'YES'):
             for msg in arg:
                 print(msg, end='')

@@ -137,7 +137,10 @@ class Car:
 
     def getPositionAndSpeed(self):
         return (self.currentLinkIndex, self.distanceInLink, self.speed, self.direction)
-    
+
+    def getCurrentLinkIndex(self):
+        return self.currentLinkIndex
+
     def hasReachedDestination(self, currentLinkDistance):
         if self.currentLinkIndex == self.destinationLinkIndex:
             if self.distanceInLink > currentLinkDistance:
@@ -151,6 +154,9 @@ class Car:
     
     def assignLinks(newLinks):
         Car.links = newLinks
+
+    def getDirection(self):
+        return self.direction
 
     def getTimeTravelled(self, timeExited):
         return timeExited - self.timeEntered
