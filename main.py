@@ -1,6 +1,3 @@
-from link import Link
-from intersection import Intersection
-from car import Car
 from scenario import Scenario
 
 import time as time_lib
@@ -19,9 +16,10 @@ START_BREAKING_DISTANCE = 40 # (m)
 INTERSECTION_SPEED = 8
 CAR_LENGTH = 6
 MIN_CAR_LENGTH_BETWEEN_CARS = 1.5
+ROAD_WIDTH = 6 # declared in display as well
 
 
-SCENARIO_NUMBER = 2
+SCENARIO_NUMBER = 5
 SIMULATIONS_PER_CHANGE = 1
 POINTS_SIMULATED = 9
 SPEED_IN_KMPERHOUR = True
@@ -38,7 +36,7 @@ MEASURING_PERIOD = 60 * 5 # (s)
 # debugging
 DEBUG_PRINT_ON = True
 DEBUG_PRINT_ONLY_SELECTED = True
-DISPLAY_ON = False
+DISPLAY_ON = True
 
 
 # initialize public variables
@@ -54,28 +52,24 @@ display = Display()
 timer = Timer()
 measuringStarted = 0 # (s) = time measuring was started
 previousProcessingTimestamp = 0
+carsArrived = 0
 
 # needs serious attention
-currentPhaseDistribution = 0.1
+currentPhaseDistribution = 0.5 # value represent the starting phase distribution
 bestPhaseDistribution = 0.1
 
+# gradient
+gradientStep = 0.2
 
 
 
 
 
-
-
-
-def resetSimulation():
-    global cars
+def setupSimulation():
     global links
     global intersections
-    global time
-    global systemTimeTravelled
-    global systemDistanceTravelled
     global entries
-    global measuringStarted
+    global meanSystemSpeedLog
 
     current_scenario = Scenario.loadScenario(SCENARIO_NUMBER)
     cars = current_scenario['cars']
@@ -83,17 +77,44 @@ def resetSimulation():
     intersections = current_scenario['intersections']
     entries = current_scenario['entries']
 
-    time = 0
-
     if DISPLAY_ON:
         display.setup(links, intersections, 1 / TIME_STEP)
 
+    meanSystemSpeedLog = [-1.0] * int(MEAN_SYSTEM_SPEED_CONSISTENCY_PERIOD / CHECK_MEAN_SYSTEM_SPEED_TIMESTEP)
 
+
+
+def resetSimulation():
+    global cars
+    global time
+    global systemTimeTravelled
+    global systemDistanceTravelled
+    global measuringStarted
+    global meanSystemSpeedLog
+    global carsArrived
+
+    current_scenario = Scenario.loadScenario(SCENARIO_NUMBER)
+    cars = current_scenario['cars']
+    time = 0
     systemDistanceTravelled = 0
     systemTimeTravelled = 0
+
+    carsArrived = 0
+
     # measuringStarted = 0 # should actually be included, but getting irregular results with different starting times
 
+    #clearMeanSystemsLog()
+    meanSystemSpeedLog = [-1.0] * int(MEAN_SYSTEM_SPEED_CONSISTENCY_PERIOD / CHECK_MEAN_SYSTEM_SPEED_TIMESTEP)
 
+
+
+def clearMeanSystemsLog():
+    global meanSystemSpeedLog
+    for i in range(len(meanSystemSpeedLog)):
+        if i < MEAN_SYSTEM_SPEED_CONSISTENCY_PERIOD / CHECK_MEAN_SYSTEM_SPEED_TIMESTEP:
+            meanSystemSpeedLog[i] = -1
+        else:
+            meanSystemSpeedLog.pop(i)
 
 def speedToString(speed):
     if (SPEED_IN_KMPERHOUR):
@@ -106,14 +127,6 @@ def printDebug(*arg, selected = 'NO'):
             print (msg, end='')
 
 
-def generateNewCars():
-    global entries
-    global time
-
-    for entry in entries:
-        possibleNewCar = entry.possiblyGenerateCar(time)
-        if possibleNewCar:
-            cars.append(possibleNewCar)
 
 def runSingleTimestep():
     global cars
@@ -123,12 +136,13 @@ def runSingleTimestep():
     global allHasReachedDestination
     global systemTimeTravelled
     global systemDistanceTravelled
+    global carsArrived
 
     allHasReachedDestination = True
 
     carsToBeRemoved = []
 
-    generateNewCars2()
+    generateNewCars()
 
     for i in range(len(cars)):
 
@@ -158,8 +172,14 @@ def runSingleTimestep():
             if (distanceInLink > links[currentLink].getDistance()):
                 if (links[currentLink].getIntersection(direction) != -1): # change to another link
                     cars[i].addDistanceTravelled(links[currentLink].getDistance())
+
+                    # done: use updated version below (which accomodates for intersections)
+                    #cars[i].changeLink(intersections[links[currentLink].getIntersection(direction)].getLink(direction),
+                    #                   distanceInLink - links[currentLink].getDistance(), direction)
+
                     cars[i].changeLink(intersections[links[currentLink].getIntersection(direction)].getLink(direction),
-                                       distanceInLink - links[currentLink].getDistance(), direction)
+                                       distanceInLink - links[currentLink].getDistance() - ROAD_WIDTH, direction)
+
                     # print('Changing to  link', intersections[links[currentLink].getIntersection(direction)].getLink(direction), 'from intersection', links[currentLink].getIntersection(direction), end='')
                 else: # car has reached destination
                     cars[i].addDistanceTravelled(distanceInLink)
@@ -167,6 +187,7 @@ def runSingleTimestep():
                     systemDistanceTravelled += cars[i].getDistanceTravelled()
                     systemTimeTravelled += cars[i].getTimeTravelled(time + TIME_STEP) # by this stage, move has already been executed
                     carsToBeRemoved.append(i)
+                    carsArrived += 1
 
         else:
             printDebug("  \talready arrived")
@@ -177,9 +198,10 @@ def runSingleTimestep():
         cars.pop(i)
 
     if DISPLAY_ON:
-        display.update(cars, time)
+        display.update(cars, time, carsArrived, systemDistanceTravelled / (systemTimeTravelled + 0.00001))
 
     continueSimulation = True
+
     if round(time,1) % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
         continueSimulation = checkMeanSystemSpeed()
 
@@ -189,13 +211,7 @@ def runSingleTimestep():
 
 def generateNewCars():
     for entry in entries:
-        possibleCar = entry.possiblyGenerateCar(time)
-        if possibleCar:
-            cars.append(possibleCar)
-
-def generateNewCars2():
-    for entry in entries:
-        entry.possiblyGenerateCar2(TIME_STEP)
+        entry.possiblyGenerateCar(TIME_STEP, time)
 
         if entry.hasCarAvailable(): # don't want to spend time on looping through all cars when unnecessary
             distanceTillNextCar = findNextObstacle(entry.getLink(), 0, entry.getDirection())[0]
@@ -258,7 +274,12 @@ def checkMeanSystemSpeed():
             systemTimeTravelled = 0
             systemDistanceTravelled = 0
 
-            # printDebug("Measuring turned on at ", time, "\nOld mean system speed is ", oldMeanSystemSpeed, "\nNew mean system speed is ", newMeanSystemSpeed, '', selected='YES')
+            printDebug("Measuring turned on at ", time, "\nOld mean system speed is ", oldMeanSystemSpeed, "\nNew mean system speed is ", newMeanSystemSpeed, '\n', selected='YES')
+
+    # this is a hack
+    if time == measuringStarted:
+        systemTimeTravelled = 0
+        systemDistanceTravelled = 0
 
     return True
 
@@ -268,6 +289,25 @@ def changeIntersectionTimings():
 
     for intersection in intersections:
         intersection.setPhaseDistribution(currentPhaseDistribution)
+
+def changeIntersectionTimings2(searchDirection, previousResult, newPoint, newResult, intersection):
+    global currentPhaseDistribution
+
+    if newResult < previousResult:
+        searchDirection = - searchDirection
+        printDebug("Changing search direction", selected='YES')
+
+    newPoint = newPoint + searchDirection * 0.1
+
+    # limiting
+    if newPoint > .95:
+        newPoint = .95
+    elif newPoint < 0.05:
+        newPoint = 0.05
+
+    currentPhaseDistribution = newPoint
+
+    intersection.setPhaseDistribution(currentPhaseDistribution)
 
 def measureProcessingTime():
     global previousProcessingTimestamp
@@ -279,48 +319,63 @@ def measureProcessingTime():
 def startProcessingTimer():
     time_lib.process_time()
 
-def printAverageProcessingTime(divider):
-    printDebug("Average processing time: ", elapsedProcessingTime, 's\n', selected='YES')
-
-
 def runMultipleSimulations():
     maximumMeanSystemSpeed = 0
 
+    setupSimulation()
+
     timer.startTime()
 
-    for i in range(POINTS_SIMULATED):
-        for j in range(SIMULATIONS_PER_CHANGE):
+    searchDirection = 1
+    previousResult = 2
 
-            printDebug("\n\nStarting simulation..."
-                       "\nPhaseDistribution: ", currentPhaseDistribution, "\n", selected='YES')
-            resetSimulation()
-            runSingleSimulation()
-            timer.lap()
+    for intersection in intersections:
+        for i in range(POINTS_SIMULATED):
+            # changeIntersectionTimings()
 
-        measuredMeanSystemSpeed = systemDistanceTravelled / systemTimeTravelled
+            measuredMeanSystemSpeeds = []
 
-        if maximumMeanSystemSpeed < measuredMeanSystemSpeed:
-            maximumMeanSystemSpeed = measuredMeanSystemSpeed
-            global bestPhaseDistribution
-            bestPhaseDistribution = currentPhaseDistribution
+            for j in range(SIMULATIONS_PER_CHANGE):
 
-        changeIntersectionTimings()
+                printDebug("\n\nStarting simulation..."
+                           "\nPhaseDistribution: ", currentPhaseDistribution, "\n", selected='YES')
+                resetSimulation()
+                # printDebug("meanSpeedsLog: ", meanSystemSpeedLog, "\n", selected='YES')
+                runSingleSimulation()
+                newMeasuredMeanSystemSpeed = systemDistanceTravelled / systemTimeTravelled
+                printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', selected='YES')
+                measuredMeanSystemSpeeds.append(systemDistanceTravelled / systemTimeTravelled)
+                timer.lap()
+
+            measuredMeanSystemSpeeds.sort()
+            middleMeasuredSystemSpeed = measuredMeanSystemSpeeds[round((SIMULATIONS_PER_CHANGE - 1)/2)]
+
+            if maximumMeanSystemSpeed < middleMeasuredSystemSpeed:
+                maximumMeanSystemSpeed = middleMeasuredSystemSpeed
+                global bestPhaseDistribution
+                bestPhaseDistribution = currentPhaseDistribution
+
+            changeIntersectionTimings2(searchDirection, previousResult, currentPhaseDistribution, middleMeasuredSystemSpeed, intersection)
+            previousResult = middleMeasuredSystemSpeed
+
+            intersection.setPhaseDistribution(bestPhaseDistribution)
 
 
 
 
-    print ('\n\nALL SIMULATIONS FINISHED')
-    timer.printAverage(SIMULATIONS_PER_CHANGE * POINTS_SIMULATED)
-    # print ('Processing time (per simulation): ' + str(processing_time / SIMULATIONS_PER_CHANGE) + 's')
 
-    # print("\nSimulated time to reach exits:")
-    # print(str(round(time, 1)) + "s")
+        print ('\n\nALL SIMULATIONS FINISHED')
+        timer.printAverage(SIMULATIONS_PER_CHANGE * POINTS_SIMULATED)
+        # print ('Processing time (per simulation): ' + str(processing_time / SIMULATIONS_PER_CHANGE) + 's')
 
-    print ("_____________________________________________\n",
-           "Best phase distribution: ", bestPhaseDistribution,
-           "\nMean system speed: ", maximumMeanSystemSpeed, "m/s",
-           "\nMean system speed: ", speedToString(maximumMeanSystemSpeed), "kmh/h",
-           "\n_____________________________________________\n",)
+        # print("\nSimulated time to reach exits:")
+        # print(str(round(time, 1)) + "s")
+
+        print ("_____________________________________________\n",
+               "Best phase distribution: ", bestPhaseDistribution,
+               "\nMean system speed: ", maximumMeanSystemSpeed, "m/s",
+               "\nMean system speed: ", speedToString(maximumMeanSystemSpeed), "kmh/h",
+               "\n_____________________________________________\n",)
 
 
 runMultipleSimulations()

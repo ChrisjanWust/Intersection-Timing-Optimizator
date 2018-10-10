@@ -4,11 +4,14 @@
 
 DEBUG_PRINT_ON = False
 
+DEFAULT_PHASE_DISTRIBUTION = 0.5
+DEFAULT_PERIOD = 60
+
 class Intersection:
     
     # need to add dynamic different timing cycles
     
-    def __init__(self, links, phaseDistribution=0.5, period=40):
+    def __init__(self, links, phaseDistribution = DEFAULT_PHASE_DISTRIBUTION, period = DEFAULT_PERIOD):
         self.links = links
         self.phaseDistribution = phaseDistribution
         self.period = period

@@ -3,6 +3,7 @@
 
 # In[ ]:
 
+import numpy as np
 
 
 SPEED_LIMIT = 15 # upper speed limit (m/s)
@@ -18,7 +19,7 @@ DEBUG_PRINT_ON = False
 class Car:
     links = []
     
-    def __init__(self, currentLinkIndex, direction, speed, destinationLinkIndex, distanceInLink = 0.0, timeEntered = 0.0):
+    def __init__(self, currentLinkIndex, direction, speed, destinationLinkIndex, timeEntered = 0.0, distanceInLink = 0.0):
         self.currentLinkIndex = currentLinkIndex
         self.destinationLinkIndex = destinationLinkIndex
         #self.currentLink = Link(currentLink[0])
@@ -27,6 +28,7 @@ class Car:
         self.direction = direction
         self.distanceTravelled = 0
         self.timeEntered = timeEntered
+        self.aggresiveness = np.random.normal(0, 1)
 
 
     def printDebug(self, *arg):

@@ -1,23 +1,26 @@
 import pygame
 
-SCALE = 2
-WINDOW_HEIGHT = 600
-WINDOW_WIDTH = 1200
+SCALE = 4
+WINDOW_HEIGHT = 720
+WINDOW_WIDTH = 1280
 CAR_LENGTH = 5
 CAR_WIDTH = 2
 ROAD_COLOR = (150,150,150)
 CAR_COLOR = (0, 0, 230)
-ROAD_WIDTH = 6
+ROAD_WIDTH = 6 # declared in main as well
 
 TIME_TEXT_SIZE = 36
 
 FIRST_INTERSECTION_INDEX = 0
-FIRST_INTERSECTION_X = 120
-FIRST_INTERSECTION_Y = 120
+FIRST_INTERSECTION_X = 60
+FIRST_INTERSECTION_Y = 60
+
 
 FRAME_BY_FRAME = False
 IGNORE_FPS = False
+FPS_MULTIPLIER = 10
 DEBUG_PRINT_ON = False
+SHOW_CARS_ARRIVED = True
 
 #           DIRECTIONS
 #
@@ -98,9 +101,20 @@ class Display:
 
 
     def drawTime(self, time):
-        text = self.font.render(str(time), True, (200, 200, 200))
-        self.window.blit(text, (WINDOW_WIDTH - 100, 30))
+        text = self.font.render("Time(s): " + str(time), True, (200, 200, 200))
+        self.window.blit(text, (WINDOW_WIDTH - 284, 30))
         #self.window.blit(text, (100,100))
+
+    def drawCarsArrived(self, time, tally):
+        text = self.font.render('Cars arrived: ' + str(tally), True, (200, 200, 200))
+        self.window.blit(text, (WINDOW_WIDTH - 360, 80))
+
+        text = self.font.render('Arrival rate (veh/h): ' + str(round(tally * 3600 / (time + 0.000001), 1)), True, (200, 200, 200))
+        self.window.blit(text, (WINDOW_WIDTH - 465, 130))
+
+    def drawMeanSystemSpeed(self, meanSystemSpeed):
+        text = self.font.render('Mean System Speed: ' + str(round(meanSystemSpeed, 1)), True, (200, 200, 200))
+        self.window.blit(text, (WINDOW_WIDTH - 475, 180))
 
 
     def exploreIntersection(self, intersectionIndex, intersectionCoordinates):
@@ -163,17 +177,22 @@ class Display:
         return [i * SCALE for i in originalValue]
 
 
-    def update(self, cars, time):
+    def update(self, cars, time, carsArrived = None, meanSystemSpeed = None):
         self.window.fill((0,0,0))
 
         self.drawNetwork()
         self.drawCars(cars)
         self.drawTime(time)
 
+        if carsArrived is not None:
+            self.drawCarsArrived(time, carsArrived)
+        if meanSystemSpeed is not None:
+            self.drawMeanSystemSpeed(meanSystemSpeed)
+
         if FRAME_BY_FRAME:
             self.waitTillKey(pygame.K_RIGHT)
         elif not IGNORE_FPS:
-            self.clock.tick(self.fps)
+            self.clock.tick(self.fps * FPS_MULTIPLIER)
 
         pygame.display.update()
 

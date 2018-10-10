@@ -15,29 +15,45 @@ class Entry:
         self.vehiclesPerHour = vehiclesPerHour
         self.destinations = destinations
         self.queue = 0
+        self.carQueue = []
 
-    def possiblyGenerateCar(self, time):
+    def possiblyGenerateCarOrg(self, time):
         if round(time,1) % (3600 / self.vehiclesPerHour) == 0:
             return Car(self.link, self.direction, 10, self.destinations[0])
         return None
 
-    def possiblyGenerateCar2(self, TIME_STEP):
+    def possiblyGenerateCarOrg2(self, TIME_STEP):
         lamda = TIME_STEP * self.vehiclesPerHour / 3600
         numberOfCarsAdded = np.random.poisson(lamda)
         self.queue += numberOfCarsAdded
 
         self.printDebug("# generated:", numberOfCarsAdded)
 
+    def possiblyGenerateCarDeterministic(self, TIME_STEP, time):
+        if round(time,1) % (3600 / self.vehiclesPerHour) == 0:
+            self.carQueue.append(Car(self.link, self.direction, 10, self.destinations[0], time))
+            self.printDebug("Car generated")
+
+
+    def possiblyGenerateCar(self, TIME_STEP, time):
+        lamda = TIME_STEP * self.vehiclesPerHour / 3600
+        numberOfCarsAdded = np.random.poisson(lamda)
+
+        for i in range(numberOfCarsAdded):
+            self.carQueue.append(Car(self.link, self.direction, 10, self.destinations[0], time))
+
+        self.printDebug("# generated:", numberOfCarsAdded)
+
     def possiblyGetCar(self):
-        if self.queue > 0:
-            self.queue -= 1
-            return Car(self.link, self.direction, 10, self.destinations[0])
+        if self.carQueue:
+            return self.carQueue.pop(0)
         return None
 
     def hasCarAvailable(self):
-        if self.queue > 0:
+        if self.carQueue:
             return True
         return False
+
 
     def getLink(self):
         return self.link
