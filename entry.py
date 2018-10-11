@@ -5,6 +5,8 @@
 from car import Car
 import numpy as np
 
+AGGRESSIVENESS_STD_DEVIATION = 0.04
+
 DEBUG_PRINT_ON = False
 
 class Entry:
@@ -16,6 +18,11 @@ class Entry:
         self.destinations = destinations
         self.queue = 0
         self.carQueue = []
+
+
+    def seed(self, seed_number):
+        np.random.seed(seed_number)
+
 
     def possiblyGenerateCarOrg(self, time):
         if round(time,1) % (3600 / self.vehiclesPerHour) == 0:
@@ -40,7 +47,7 @@ class Entry:
         numberOfCarsAdded = np.random.poisson(lamda)
 
         for i in range(numberOfCarsAdded):
-            self.carQueue.append(Car(self.link, self.direction, 10, self.destinations[0], time))
+            self.carQueue.append(Car(self.link, self.direction, 10, self.destinations[0], timeEntered=time, aggressiveness=np.random.normal(1, AGGRESSIVENESS_STD_DEVIATION)))
 
         self.printDebug("# generated:", numberOfCarsAdded)
 

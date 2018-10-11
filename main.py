@@ -4,7 +4,7 @@ import time as time_lib
 from timer import Timer
 from display import Display
 
-
+import numpy as np
 
 
 # INITIALIZE CONSTANTS
@@ -20,9 +20,9 @@ ROAD_WIDTH = 6 # declared in display as well
 
 
 SCENARIO_NUMBER = 5
+SEED = 1
 SIMULATIONS_PER_CHANGE = 1
 POINTS_SIMULATED = 9
-SPEED_IN_KMPERHOUR = True
 
 STOP_DISTANCE_FROM_LINE = 2 # (m) = meters from intersection line to where car stops
 
@@ -37,6 +37,7 @@ MEASURING_PERIOD = 60 * 5 # (s)
 DEBUG_PRINT_ON = True
 DEBUG_PRINT_ONLY_SELECTED = True
 DISPLAY_ON = True
+SPEED_IN_KMPERHOUR = True
 
 
 # initialize public variables
@@ -63,6 +64,10 @@ gradientStep = 0.2
 
 
 
+def seedEntries(seed):
+    np.random.seed(seed)
+    for entry in entries:
+        entry.seed(np.random.randint(0, 1000))
 
 
 def setupSimulation():
@@ -72,7 +77,6 @@ def setupSimulation():
     global meanSystemSpeedLog
 
     current_scenario = Scenario.loadScenario(SCENARIO_NUMBER)
-    cars = current_scenario['cars']
     links = current_scenario['links']
     intersections = current_scenario['intersections']
     entries = current_scenario['entries']
@@ -93,8 +97,9 @@ def resetSimulation():
     global meanSystemSpeedLog
     global carsArrived
 
+
     current_scenario = Scenario.loadScenario(SCENARIO_NUMBER)
-    cars = current_scenario['cars']
+    cars = []
     time = 0
     systemDistanceTravelled = 0
     systemTimeTravelled = 0
@@ -162,11 +167,8 @@ def runSingleTimestep():
 
             nextObject_distance, nextObject_speed = findNextObstacle(currentLink, distanceInLink, direction)
 
-
             # move
-            distanceInLink = cars[i].move2(nextObject_distance, nextObject_speed)
-
-
+            distanceInLink = cars[i].move2withAggressiveness(nextObject_distance, nextObject_speed) # move2 is reliable @ 11 Oct
 
             # routing
             if (distanceInLink > links[currentLink].getDistance()):
@@ -202,7 +204,7 @@ def runSingleTimestep():
 
     continueSimulation = True
 
-    if round(time,1) % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
+    if time % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
         continueSimulation = checkMeanSystemSpeed()
 
     time = round(time + TIME_STEP, 1)
@@ -334,6 +336,8 @@ def runMultipleSimulations():
             # changeIntersectionTimings()
 
             measuredMeanSystemSpeeds = []
+
+            seedEntries(SEED + i * 10)
 
             for j in range(SIMULATIONS_PER_CHANGE):
 

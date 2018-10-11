@@ -2,13 +2,15 @@ from link import Link
 from intersection import Intersection
 from car import Car
 from entry import Entry
-
+import numpy as np
 
 
 
 
 
 class Scenario:
+
+
 
 
     def loadScenario(scenario_nr):
