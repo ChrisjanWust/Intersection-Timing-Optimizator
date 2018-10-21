@@ -12,6 +12,7 @@ MAX_ACCELERATION = 0.9 # (m/s^2)
 TIME_STEP = 0.1 # (s)
 START_BREAKING_DISTANCE = 40 # (m)
 FOLLOWING_TIME = 2 # (s)
+MIN_SPEED_IN_SINGLE_LINK = 0.6 # (m/s)
 
 DEBUG_PRINT_ON = False
 
@@ -28,10 +29,7 @@ class Car:
         self.distanceTravelled = 0
         self.timeEntered = timeEntered
         self.aggressiveness = aggressiveness # normal is 1. Greater than one is more aggressive. Shouldn't be more than 1.4
-
-
-    def seed(self, seed_number):
-        np.random.seed(seed_number)
+        self.timeLinkChanged = timeEntered
 
 
     def printDebug(self, *arg):
@@ -311,10 +309,18 @@ class Car:
         self.direction = direction
 
 
-    def changeLink(self, newLinkIndex, newDistanceInLink, newDirection):
+    def changeLink(self, newLinkIndex, newDistanceInLink, newDirection, time=None):
         self.currentLinkIndex = newLinkIndex
         self.distanceInLink = newDistanceInLink
         self.direction = newDirection
+        self.timeLinkChanged = time
+
+    def checkConstraintsOk (self, time):
+        if time - self.timeLinkChanged > 60:
+            if self.distanceInLink / (time - self.timeLinkChanged + 0.0000001) < MIN_SPEED_IN_SINGLE_LINK:
+                return False
+
+        return True
 
     def addDistanceTravelled(self, distance):
         self.distanceTravelled += distance

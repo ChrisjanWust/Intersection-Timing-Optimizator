@@ -18,10 +18,16 @@ CAR_LENGTH = 6
 MIN_CAR_LENGTH_BETWEEN_CARS = 1.5
 ROAD_WIDTH = 6 # declared in display as well
 
+# CONSTRAINTS
+CONSTRAINTS_ACTIVE = False
+MAX_ENTRY_QUEUE = 7
+CHECK_CONSTRAINTS_TIMESTEP = 20
+MAX_VEHICLE_DENSITY = 0.5 # (veh / m) . 0.15 still activates sometimes
 
-SCENARIO_NUMBER = 5
-SEED = 1
-SIMULATIONS_PER_CHANGE = 1
+
+SCENARIO_NUMBER = 1
+SEED = 7 # 5 is not bad
+SIMULATIONS_PER_CHANGE = 3
 POINTS_SIMULATED = 9
 
 STOP_DISTANCE_FROM_LINE = 2 # (m) = meters from intersection line to where car stops
@@ -30,12 +36,12 @@ STOP_DISTANCE_FROM_LINE = 2 # (m) = meters from intersection line to where car s
 CHECK_MEAN_SYSTEM_SPEED_TIMESTEP = 10 * TIME_STEP # (number of timesteps) = only check every X timesteps whether the mean speed has aggregated
 MEAN_SYSTEM_SPEED_CONSISTENCY_PERIOD = 60 * 2 # (S) = time during which mean system speed must stay consistent
 MEAN_SYSTEM_SPEED_AGGREGATION_PERCENTAGE = 10 # (%) =  current mean system speed must within this percentage of old mean system speed before measuring can begin
-MEASURING_PERIOD = 60 * 5 # (s)
+MEASURING_PERIOD = 60 * 5 # (s) = 5 mins
 
 
 # debugging
 DEBUG_PRINT_ON = True
-DEBUG_PRINT_ONLY_SELECTED = True
+GLOBAL_DEBUG_LEVEL = 5
 DISPLAY_ON = True
 SPEED_IN_KMPERHOUR = True
 
@@ -54,6 +60,12 @@ timer = Timer()
 measuringStarted = 0 # (s) = time measuring was started
 previousProcessingTimestamp = 0
 carsArrived = 0
+
+#constraintVariables
+phaseDistributionUpperLimit = 0.9
+phaseDistributionLowerLimit = 0.1
+cyclePeriodUpperLimit = 180
+cyclePeriodLowerLimit = 30
 
 # needs serious attention
 currentPhaseDistribution = 0.5 # value represent the starting phase distribution
@@ -97,8 +109,6 @@ def resetSimulation():
     global meanSystemSpeedLog
     global carsArrived
 
-
-    current_scenario = Scenario.loadScenario(SCENARIO_NUMBER)
     cars = []
     time = 0
     systemDistanceTravelled = 0
@@ -126,8 +136,8 @@ def speedToString(speed):
         return str(round(speed * 3.6,2)) + str('km/h')
     return str(round(speed,2)) + str('m/s')
 
-def printDebug(*arg, selected = 'NO'):
-    if DEBUG_PRINT_ON and ((not DEBUG_PRINT_ONLY_SELECTED) or selected == 'YES'):
+def printDebug(*arg, debugLevel = 0):
+    if DEBUG_PRINT_ON and debugLevel >= GLOBAL_DEBUG_LEVEL:
         for msg in arg:
             print (msg, end='')
 
@@ -154,7 +164,7 @@ def runSingleTimestep():
         currentLink, distanceInLink, speed, direction = cars[
             i].getPositionAndSpeed()  # could get this with separate get methods
 
-        printDebug("\n", round(time, 1), "s  ", "\tcar: ", i,
+        printDebug("\n", time, "s  ", "\tcar: ", i,
                    "\tcurrentLink: ", currentLink,
                    "\tdistanceInLink: ", round(distanceInLink, 2),
                    " \tspeed: ", speedToString(speed))
@@ -180,7 +190,7 @@ def runSingleTimestep():
                     #                   distanceInLink - links[currentLink].getDistance(), direction)
 
                     cars[i].changeLink(intersections[links[currentLink].getIntersection(direction)].getLink(direction),
-                                       distanceInLink - links[currentLink].getDistance() - ROAD_WIDTH, direction)
+                                       distanceInLink - links[currentLink].getDistance() - ROAD_WIDTH, direction, time=time)
 
                     # print('Changing to  link', intersections[links[currentLink].getIntersection(direction)].getLink(direction), 'from intersection', links[currentLink].getIntersection(direction), end='')
                 else: # car has reached destination
@@ -207,6 +217,14 @@ def runSingleTimestep():
     if time % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
         continueSimulation = checkMeanSystemSpeed()
 
+    if CONSTRAINTS_ACTIVE:
+        if time % CHECK_CONSTRAINTS_TIMESTEP == 0:
+            constraintsOk = checkConstraints()
+            if not constraintsOk:
+                setPhaseDistributionLimit()
+            continueSimulation = continueSimulation and constraintsOk
+
+
     time = round(time + TIME_STEP, 1)
 
     return continueSimulation
@@ -215,12 +233,59 @@ def generateNewCars():
     for entry in entries:
         entry.possiblyGenerateCar(TIME_STEP, time)
 
-        if entry.hasCarAvailable(): # don't want to spend time on looping through all cars when unnecessary
+        if entry.getQueueLength(): # don't want to spend time on looping through all cars when unnecessary
             distanceTillNextCar = findNextObstacle(entry.getLink(), 0, entry.getDirection())[0]
             if distanceTillNextCar > 0:
                 cars.append(entry.possiblyGetCar()) # there will definitely be a car since this is in "if entry.hasCarAvailable"
 
 
+
+def checkIndividualSpeedInLinks():
+    for car in cars:
+        if not car.checkConstraintsOk(time):
+            return False
+
+    return True
+
+
+def checkEntryQueueLengths():
+    for entry in entries:
+        if entry.getQueueLength() > MAX_ENTRY_QUEUE:
+            return False
+
+    return True
+
+def checkCarDensity ():
+    nrCarsInLinks = [0] * len(links)
+    for car in cars:
+        currentLink = car.getPositionAndSpeed()[0]
+        nrCarsInLinks[currentLink] += 1
+
+    i = 0
+    for nrCarsInLink in nrCarsInLinks:
+        if nrCarsInLink / links[i].getDistance() > MAX_VEHICLE_DENSITY:
+            return False
+        i += 1
+
+    return True
+
+
+def setPhaseDistributionLimit():
+    global phaseDistributionUpperLimit
+    global phaseDistributionLowerLimit
+
+    if currentPhaseDistribution - phaseDistributionLowerLimit < phaseDistributionUpperLimit - currentPhaseDistribution:
+        phaseDistributionLowerLimit = currentPhaseDistribution
+        printDebug('Lower phase distribution limit set at ', currentPhaseDistribution, debugLevel=1)
+    else:
+        phaseDistributionUpperLimit = currentPhaseDistribution
+        printDebug('Upper phase distribution limit set at ', currentPhaseDistribution, debugLevel=1)
+
+
+
+def checkConstraints():
+    constraintsOk = checkEntryQueueLengths() and checkIndividualSpeedInLinks() and checkCarDensity()
+    return constraintsOk
 
 def findNextObstacle(linkIndex, distanceInLink, direction):
     # initialize with maximum
@@ -234,8 +299,6 @@ def findNextObstacle(linkIndex, distanceInLink, direction):
             nextObjectSpeed = INTERSECTION_SPEED
         else:
             nextObjectSpeed = 0
-
-    # todo: initialize with intersection details
 
     for car in cars:
         carLinkIndex, carDistanceInLink, carSpeed, carDirection = car.getPositionAndSpeed()
@@ -251,6 +314,7 @@ def findNextObstacle(linkIndex, distanceInLink, direction):
 
 
 def runSingleSimulation():
+    resetSimulation()
     runSimulation = True
 
     while runSimulation:
@@ -263,9 +327,9 @@ def checkMeanSystemSpeed():
     global meanSystemSpeedLog
 
     if measuringStarted:
-        if round(time,1) - measuringStarted > MEASURING_PERIOD:
+        if time - measuringStarted > MEASURING_PERIOD:
             printDebug("Measuing period is over at ", time, ".\nSimulation stopping...",
-                       "\n", selected='YES')
+                       "\n", debugLevel=1)
             return False
     elif systemTimeTravelled > 0:
         newMeanSystemSpeed = systemDistanceTravelled/systemTimeTravelled
@@ -276,7 +340,7 @@ def checkMeanSystemSpeed():
             systemTimeTravelled = 0
             systemDistanceTravelled = 0
 
-            printDebug("Measuring turned on at ", time, "\nOld mean system speed is ", oldMeanSystemSpeed, "\nNew mean system speed is ", newMeanSystemSpeed, '\n', selected='YES')
+            printDebug("Measuring turned on at ", time, "\nOld mean system speed is ", oldMeanSystemSpeed, "\nCurrent mean system speed is ", newMeanSystemSpeed, '\n', debugLevel=1)
 
     # this is a hack
     if time == measuringStarted:
@@ -285,19 +349,12 @@ def checkMeanSystemSpeed():
 
     return True
 
-def changeIntersectionTimings():
-    global currentPhaseDistribution
-    currentPhaseDistribution += 0.1
-
-    for intersection in intersections:
-        intersection.setPhaseDistribution(currentPhaseDistribution)
-
 def changeIntersectionTimings2(searchDirection, previousResult, newPoint, newResult, intersection):
     global currentPhaseDistribution
 
     if newResult < previousResult:
         searchDirection = - searchDirection
-        printDebug("Changing search direction", selected='YES')
+        printDebug("Changing search direction", debugLevel=1)
 
     newPoint = newPoint + searchDirection * 0.1
 
@@ -315,11 +372,55 @@ def measureProcessingTime():
     global previousProcessingTimestamp
     newProcessingTimestamp = time_lib.process_time()
     elapsedProcessingTime = newProcessingTimestamp - previousProcessingTimestamp
-    printDebug("Delta processing time: ", elapsedProcessingTime, 's\n', selected='YES')
+    printDebug("Delta processing time: ", elapsedProcessingTime, 's\n', debugLevel=1)
     previousProcessingTimestamp = newProcessingTimestamp
 
 def startProcessingTimer():
     time_lib.process_time()
+
+
+def runMeasurementSimulations():
+    global currentPhaseDistribution
+
+    resolution = 100
+    currentPhaseDistribution = 1 / resolution
+    setupSimulation()
+
+    printDebug('Phase Distribution\tMean System Speed\n', debugLevel=5)
+
+    for intersection in intersections:
+        for i in range(resolution - 1):
+
+            measuredMeanSystemSpeeds = []
+
+
+            for j in range(SIMULATIONS_PER_CHANGE):
+                seedEntries(SEED + j * 10)
+
+                printDebug("\n\nStarting simulation..."
+                           "\nPhaseDistribution: ", currentPhaseDistribution, "\n", debugLevel=1)
+                # printDebug("meanSpeedsLog: ", meanSystemSpeedLog, "\n", selected=1)
+                resetSimulation()
+                runSingleSimulation()
+                newMeasuredMeanSystemSpeed = systemDistanceTravelled / systemTimeTravelled
+                printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', debugLevel=1)
+                measuredMeanSystemSpeeds.append(systemDistanceTravelled / systemTimeTravelled)
+
+            measuredMeanSystemSpeeds.sort()
+            middleMeasuredSystemSpeed = measuredMeanSystemSpeeds[round((SIMULATIONS_PER_CHANGE - 1)/2)]
+
+            printDebug(currentPhaseDistribution, '\t\t\t', middleMeasuredSystemSpeed, '\n', debugLevel=5)
+
+            currentPhaseDistribution = round(currentPhaseDistribution + 1 / resolution,2)
+            intersection.setPhaseDistribution(currentPhaseDistribution)
+
+
+
+
+
+
+        print ('\n\nALL SIMULATIONS FINISHED')
+
 
 def runMultipleSimulations():
     maximumMeanSystemSpeed = 0
@@ -333,21 +434,20 @@ def runMultipleSimulations():
 
     for intersection in intersections:
         for i in range(POINTS_SIMULATED):
-            # changeIntersectionTimings()
 
             measuredMeanSystemSpeeds = []
 
-            seedEntries(SEED + i * 10)
 
             for j in range(SIMULATIONS_PER_CHANGE):
+                seedEntries(SEED + j * 10)
 
                 printDebug("\n\nStarting simulation..."
-                           "\nPhaseDistribution: ", currentPhaseDistribution, "\n", selected='YES')
+                           "\nPhaseDistribution: ", currentPhaseDistribution, "\n", debugLevel=1)
+                # printDebug("meanSpeedsLog: ", meanSystemSpeedLog, "\n", selected=1)
                 resetSimulation()
-                # printDebug("meanSpeedsLog: ", meanSystemSpeedLog, "\n", selected='YES')
                 runSingleSimulation()
                 newMeasuredMeanSystemSpeed = systemDistanceTravelled / systemTimeTravelled
-                printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', selected='YES')
+                printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', debugLevel=1)
                 measuredMeanSystemSpeeds.append(systemDistanceTravelled / systemTimeTravelled)
                 timer.lap()
 
@@ -362,7 +462,7 @@ def runMultipleSimulations():
             changeIntersectionTimings2(searchDirection, previousResult, currentPhaseDistribution, middleMeasuredSystemSpeed, intersection)
             previousResult = middleMeasuredSystemSpeed
 
-            intersection.setPhaseDistribution(bestPhaseDistribution)
+            intersection.setPhaseDistribution(bestPhaseDistribution) #todo: review this line
 
 
 
@@ -373,7 +473,6 @@ def runMultipleSimulations():
         # print ('Processing time (per simulation): ' + str(processing_time / SIMULATIONS_PER_CHANGE) + 's')
 
         # print("\nSimulated time to reach exits:")
-        # print(str(round(time, 1)) + "s")
 
         print ("_____________________________________________\n",
                "Best phase distribution: ", bestPhaseDistribution,
@@ -382,4 +481,5 @@ def runMultipleSimulations():
                "\n_____________________________________________\n",)
 
 
-runMultipleSimulations()
+#runMultipleSimulations()
+runMeasurementSimulations()

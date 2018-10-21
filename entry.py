@@ -16,25 +16,11 @@ class Entry:
         self.direction = direction
         self.vehiclesPerHour = vehiclesPerHour
         self.destinations = destinations
-        self.queue = 0
         self.carQueue = []
 
 
-    def seed(self, seed_number):
-        np.random.seed(seed_number)
-
-
-    def possiblyGenerateCarOrg(self, time):
-        if round(time,1) % (3600 / self.vehiclesPerHour) == 0:
-            return Car(self.link, self.direction, 10, self.destinations[0])
-        return None
-
-    def possiblyGenerateCarOrg2(self, TIME_STEP):
-        lamda = TIME_STEP * self.vehiclesPerHour / 3600
-        numberOfCarsAdded = np.random.poisson(lamda)
-        self.queue += numberOfCarsAdded
-
-        self.printDebug("# generated:", numberOfCarsAdded)
+    def seed(self, seedNumber):
+        np.random.seed(seedNumber)
 
     def possiblyGenerateCarDeterministic(self, TIME_STEP, time):
         if round(time,1) % (3600 / self.vehiclesPerHour) == 0:
@@ -56,10 +42,8 @@ class Entry:
             return self.carQueue.pop(0)
         return None
 
-    def hasCarAvailable(self):
-        if self.carQueue:
-            return True
-        return False
+    def getQueueLength(self):
+        return len(self.carQueue)
 
 
     def getLink(self):
