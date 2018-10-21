@@ -1,9 +1,7 @@
 from scenario import Scenario
-
 import time as time_lib
 from timer import Timer
 from display import Display
-
 import numpy as np
 
 
@@ -26,7 +24,7 @@ MAX_VEHICLE_DENSITY = 0.5 # (veh / m) . 0.15 still activates sometimes
 
 
 SCENARIO_NUMBER = 1
-SEED = 7 # 5 is not bad
+SEED = 5 # 5 is not bad
 SIMULATIONS_PER_CHANGE = 3
 POINTS_SIMULATED = 9
 
@@ -42,7 +40,7 @@ MEASURING_PERIOD = 60 * 5 # (s) = 5 mins
 # debugging
 DEBUG_PRINT_ON = True
 GLOBAL_DEBUG_LEVEL = 5
-DISPLAY_ON = True
+DISPLAY_ON = False
 SPEED_IN_KMPERHOUR = True
 
 
@@ -71,9 +69,12 @@ cyclePeriodLowerLimit = 30
 currentPhaseDistribution = 0.5 # value represent the starting phase distribution
 bestPhaseDistribution = 0.1
 
+
 # gradient
 gradientStep = 0.2
 
+# optimization
+nrSimulationRuns = 0
 
 
 def seedEntries(seed):
@@ -92,6 +93,9 @@ def setupSimulation():
     links = current_scenario['links']
     intersections = current_scenario['intersections']
     entries = current_scenario['entries']
+
+
+
 
     if DISPLAY_ON:
         display.setup(links, intersections, 1 / TIME_STEP)
@@ -378,6 +382,24 @@ def measureProcessingTime():
 def startProcessingTimer():
     time_lib.process_time()
 
+def getNrIntersections():
+    return len(intersections)
+
+def applyInputSettingsNp(inputSettings):
+    i = 0
+    for intersection in intersections:
+        intersection.setPhaseDistribution(inputSettings[0][i])
+        intersection.setPeriod(inputSettings[1])
+        intersection.setOffset(inputSettings[2][i])
+        i += 1
+
+def applyInputSettings(inputSettings):
+    i = 0
+    for intersection in intersections:
+        intersection.setPhaseDistribution(inputSettings['phaseDistributions'][i])
+        intersection.setPeriod(inputSettings['period'])
+        intersection.setOffset(inputSettings['offsets'][i])
+        i += 1
 
 def runMeasurementSimulations():
     global currentPhaseDistribution
@@ -422,15 +444,42 @@ def runMeasurementSimulations():
         print ('\n\nALL SIMULATIONS FINISHED')
 
 
-def runMultipleSimulations():
-    maximumMeanSystemSpeed = 0
+def runAdjustedSimulation(inputSettings):
+    printDebug("inputSettings changed to : ", inputSettings, '\n', debugLevel=1)
+    applyInputSettingsNp(inputSettings)
 
-    setupSimulation()
+    measuredMeanSystemSpeeds = []
 
-    timer.startTime()
+
+    for j in range(SIMULATIONS_PER_CHANGE):
+        seedEntries(SEED + j * 10)
+
+        printDebug("\n\nStarting simulation...", "\n", debugLevel=1)
+        # printDebug("meanSpeedsLog: ", meanSystemSpeedLog, "\n", selected=1)
+        resetSimulation()
+        runSingleSimulation()
+        newMeasuredMeanSystemSpeed = systemDistanceTravelled / systemTimeTravelled
+        printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', debugLevel=1)
+        measuredMeanSystemSpeeds.append(systemDistanceTravelled / systemTimeTravelled)
+
+    measuredMeanSystemSpeeds.sort()
+    middleMeasuredSystemSpeed = measuredMeanSystemSpeeds[round((SIMULATIONS_PER_CHANGE - 1)/2)]
+    simulationResult = middleMeasuredSystemSpeed
+
+    global nrSimulationRuns
+    nrSimulationRuns = +1
+
+    return simulationResult
+
+
+def runSimulationAndOptimization():
 
     searchDirection = 1
     previousResult = 2
+    maximumMeanSystemSpeed = 0
+
+    setupSimulation()
+    timer.startTime()
 
     for intersection in intersections:
         for i in range(POINTS_SIMULATED):
@@ -481,5 +530,18 @@ def runMultipleSimulations():
                "\n_____________________________________________\n",)
 
 
+
+class Simulation:
+
+    def runAdjustedSimulation(self, inputSettings):
+        return runAdjustedSimulation(inputSettings)
+
+    def setupSimulation(self):
+        setupSimulation()
+
+    def getNrIntersections(self):
+        return getNrIntersections()
+
+
 #runMultipleSimulations()
-runMeasurementSimulations()
+#runMeasurementSimulations()

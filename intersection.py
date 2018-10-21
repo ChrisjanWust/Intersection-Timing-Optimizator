@@ -11,10 +11,11 @@ class Intersection:
     
     # need to add dynamic different timing cycles
     
-    def __init__(self, links, phaseDistribution = DEFAULT_PHASE_DISTRIBUTION, period = DEFAULT_PERIOD):
+    def __init__(self, links, phaseDistribution = DEFAULT_PHASE_DISTRIBUTION, period = DEFAULT_PERIOD, offset=0):
         self.links = links
         self.phaseDistribution = phaseDistribution
         self.period = period
+        self.offset = offset
 
     #def getStatusOld(self, time, direction):
     #    if (time % 60 > self.timings[direction][0] and time % 60 < self.timings[direction][1]):
@@ -23,8 +24,9 @@ class Intersection:
     #        return "RED"
 
     def getStatus(self, time, direction):
-        perUnit = (time % self.period) / self.period
-        self.printDebug("Intersection details at ", time, "s", "\tDirection:", direction, "\tpu:", perUnit)
+        timeWithOffset = time + self.offset
+        perUnit = (timeWithOffset % self.period) / self.period
+        self.printDebug("Intersection details at ", timeWithOffset, "s", "\tDirection:", direction, "\tpu:", perUnit)
         if direction % 2 == 0 and perUnit < self.phaseDistribution:
             self.printDebug('\tTRUE\n')
             return "GREEN"
@@ -42,6 +44,9 @@ class Intersection:
 
     def setPeriod(self, period):
         self.period = period
+
+    def setOffset(self, offset):
+        self.offset = offset
 
 
     def printDebug(self, *arg):
