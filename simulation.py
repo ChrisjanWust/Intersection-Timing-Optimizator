@@ -18,8 +18,8 @@ ROAD_WIDTH = 6 # declared in display as well
 
 # CONSTRAINTS
 CONSTRAINTS_ACTIVE = False
-MAX_ENTRY_QUEUE = 7
-CHECK_CONSTRAINTS_TIMESTEP = 20
+MAX_ENTRY_QUEUE = 4
+CHECK_CONSTRAINTS_TIMESTEP = 10
 MAX_VEHICLE_DENSITY = 0.5 # (veh / m) . 0.15 still activates sometimes
 
 
@@ -35,6 +35,7 @@ CHECK_MEAN_SYSTEM_SPEED_TIMESTEP = 10 * TIME_STEP # (number of timesteps) = only
 MEAN_SYSTEM_SPEED_CONSISTENCY_PERIOD = 60 * 2 # (S) = time during which mean system speed must stay consistent
 MEAN_SYSTEM_SPEED_AGGREGATION_PERCENTAGE = 10 # (%) =  current mean system speed must within this percentage of old mean system speed before measuring can begin
 MEASURING_PERIOD = 60 * 5 # (s) = 5 mins
+AVERAGE_NOT_MEDIAN = True
 
 
 # debugging
@@ -227,7 +228,9 @@ def runSingleTimestep():
             if not constraintsOk:
                 setPhaseDistributionLimit()
             continueSimulation = continueSimulation and constraintsOk
+            print('SIMULATION CONSTRAINT REACHED')
 
+            systemDistanceTravelled = systemDistanceTravelled/10
 
     time = round(time + TIME_STEP, 1)
 
@@ -462,12 +465,17 @@ def runAdjustedSimulation(inputSettings):
         printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', debugLevel=1)
         measuredMeanSystemSpeeds.append(systemDistanceTravelled / systemTimeTravelled)
 
-    measuredMeanSystemSpeeds.sort()
-    middleMeasuredSystemSpeed = measuredMeanSystemSpeeds[round((SIMULATIONS_PER_CHANGE - 1)/2)]
-    simulationResult = middleMeasuredSystemSpeed
+    simulationResult = 0
+
+    if AVERAGE_NOT_MEDIAN:
+        simulationResult = sum(measuredMeanSystemSpeeds) / len(measuredMeanSystemSpeeds)
+    else:
+        measuredMeanSystemSpeeds.sort()
+        middleMeasuredSystemSpeed = measuredMeanSystemSpeeds[round((SIMULATIONS_PER_CHANGE - 1)/2)]
+        simulationResult = middleMeasuredSystemSpeed
 
     global nrSimulationRuns
-    nrSimulationRuns = +1
+    nrSimulationRuns += 1
 
     return simulationResult
 
@@ -541,6 +549,9 @@ class Simulation:
 
     def getNrIntersections(self):
         return getNrIntersections()
+
+    def getNrSimulationsRun(self):
+        return nrSimulationRuns
 
 
 #runMultipleSimulations()
