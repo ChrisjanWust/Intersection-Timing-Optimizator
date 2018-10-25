@@ -1,4 +1,4 @@
-import plotly.plotly as py
+import plotly.offline as offline
 import plotly.graph_objs as go
 import numpy as np
 
@@ -119,7 +119,7 @@ def removeOutliers(dataSet):
 
 
 chosenDataSet = dataSet1
-removeOutliers(chosenDataSet)
+#removeOutliers(chosenDataSet)
 dataSet = np.asarray(chosenDataSet)
 
 x = dataSet[:,0]
@@ -137,6 +137,8 @@ trace = go.Scatter(
 data = [trace]
 
 # Plot and embed in ipython notebook!
-py.iplot(data, filename='basic-scatter')
+offline.iplot(data, image='basic-scatter')
+
+iplot()
 
 

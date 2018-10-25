@@ -80,12 +80,14 @@ class Scenario:
                          Link(90, [-1, -1, -1, 5])],
 
 
-                'intersections':  [Intersection([2, 3, 0, 1]),
-                                 Intersection([5, 6, 4, 3]),
-                                 Intersection([8, 9, 7, 6]),
-                                 Intersection([0, 12, 10, 11]),
-                                 Intersection([4, 14, 13, 12]),
-                                 Intersection([7, 16, 15, 14])],
+                'intersections':  [
+                                    Intersection([2, 3, 0, 1]),
+                                    Intersection([8, 9, 7, 6]),
+                                    Intersection([0, 12, 10, 11]),
+                                    Intersection([7, 16, 15, 14]),
+                                    Intersection([4, 14, 13, 12]),
+                                    Intersection([5, 6, 4, 3])
+                                   ],
 
                 'cars':[],
 

@@ -23,8 +23,8 @@ CHECK_CONSTRAINTS_TIMESTEP = 10
 MAX_VEHICLE_DENSITY = 0.5 # (veh / m) . 0.15 still activates sometimes
 
 
-SCENARIO_NUMBER = 1
-SEED = 5 # 5 is not bad
+SCENARIO_NUMBER = 1 # 1, 3 and 5 are well defined
+SEED = 9 # 5 is not bad for 1, 5 is bad for 5
 SIMULATIONS_PER_CHANGE = 3
 POINTS_SIMULATED = 9
 

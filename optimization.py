@@ -14,7 +14,7 @@ MIN_OFFSET = 0
 MAX_OFFSET = MAX_PERIOD - MIN_PERIOD
 
 
-GLOBAL_DEBUG_LEVEL = 0
+GLOBAL_DEBUG_LEVEL = 3
 DEBUG_PRINT_ON = True
 
 simulation = Simulation()
@@ -22,6 +22,9 @@ simulation = Simulation()
 simulation.setupSimulation()
 nrIntersections = simulation.getNrIntersections()
 
+
+bestResultLog = []
+SIMULATION_BUDGET = 15
 
 defaultInputSettings = {
     'phaseDistributions': [0.5] * nrIntersections,
@@ -40,6 +43,12 @@ defaultInputSettingsNp = np.array(
 
 
 
+
+
+
+
+
+
 #############################    GENETIC ALGORTIHM NEW, USING DEAP   #############################
 toolbox = base.Toolbox()
 
@@ -47,7 +56,6 @@ GAbestResult = -1
 GAbestResultInputSettings = -1
 GAbestResultList = []
 
-NR_GENERATIONS = 9
 GA_POPULATION = 6
 
 # gaussian mutation
@@ -76,15 +84,18 @@ def evaluteGeneticAlgortihm(individual):
     return result,
 
 
-def possiblyStoreBestResult(result, inputSettings, individual):
+
+
+def possiblyStoreBestResult(result, inputSettings):
     global GAbestResult
     global GAbestResultInputSettings
-    global GAbestResultList
+    global bestResultLog
 
     if result > GAbestResult:
         GAbestResult = result
-        GAbestResultInputSettings = inputSettings
-        GAbestResultList = individual
+        GAbestResultInputSettings = inputSettings + 0
+
+    bestResultLog.append(GAbestResult)
 
 
 
@@ -113,16 +124,18 @@ def geneticAlgorithmMain():
 
     global toolbox
     pop = toolbox.population(n=GA_POPULATION)
-    CXPB, MUTPB, NGEN = CROSSOVER_PROBABILITY, MUTATION_PROBABILITY, NR_GENERATIONS
+    CXPB, MUTPB = CROSSOVER_PROBABILITY, MUTATION_PROBABILITY
 
     # Evaluate the entire population
     fitnesses = map(toolbox.evaluate, pop)
     for ind, fit in zip(pop, fitnesses):
         ind.fitness.values = fit
 
-    for g in range(NGEN):
-        printDebug('Generation ', g+1, end='\t\t')
-        printProgress((g+1)/NGEN)
+    g = 0
+    while simulation.getNrSimulationsRun() < SIMULATION_BUDGET:
+        g += 1
+        printDebug('Generation ', g, end='\t\t')
+        printProgress(simulation.getNrSimulationsRun() / SIMULATION_BUDGET)
         # Select the next generation individuals
         offspring = toolbox.select(pop, len(pop))
         # Clone the selected individuals
@@ -152,12 +165,10 @@ def geneticAlgorithmMain():
     return pop
 
 def geneticAlgorithmController():
-    finalSolution = geneticAlgorithmMain()
+    geneticAlgorithmMain()
+    printResults('Genetic Algortihm', GAbestResultInputSettings, GAbestResult)
 
-    print('Best solution:  \t', GAbestResultInputSettings)
-    print('Best individual:\t', GAbestResultList)
-    print('Result:         \t', GAbestResult)
-    print('Simulations run:\t', simulation.getNrSimulationsRun())
+
 
 
 #############################    GENETIC ALGORTIHM OLD   #############################
@@ -213,38 +224,43 @@ def mate(individual1, individual2):
 
 
 
+
+
+
+
+
+
+
+
 #############################    EXHUASTIVE SEARCH    #############################
 
 ESbestResult = 0
 ESbestResultInputSetting = defaultInputSettingsNp + 0
 
-def exhaustiveSearch():
-    SIMULATION_BUDGET = 40
+def fullExhuastiveSearch():
     SIMULATIONS_PER_INPUT = int(round(SIMULATION_BUDGET / getNrInputs(), 0))
 
     inputSettings = defaultInputSettingsNp + 0
 
-    inputsDone = 0
-
     for inputType in range(len(inputSettings)):
         if inputType == 0:      # phase distribution
             for intersectionIndex in range(len(inputSettings[inputType])):
-                singleExhuastiveSearch(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
-                inputsDone += 1
-                printProgress( inputsDone / getNrInputs())
+                inputSettings = singleExhuastiveSearch(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
+                printProgressGlobal()
         elif inputType == 1:    # cycle length
-            singleExhuastiveSearch(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, None)
-            inputsDone += 1
-            printProgress(inputsDone / getNrInputs())
+            inputSettings = singleExhuastiveSearch(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, None)
+            printProgressGlobal()
         else:                   # offset
             for intersectionIndex in range(len(inputSettings[inputType])):
-                singleExhuastiveSearch(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
-                inputsDone += 1
-                printProgress(inputsDone / getNrInputs())
-
+                inputSettings = singleExhuastiveSearch(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
+                printProgressGlobal()
+    '''
     printDebug('Exhuastive search completed.\nInputSettings:\n', inputSettings, debugLevel=5)
     printDebug('Simulation run:', simulation.getNrSimulationsRun())
     printDebug('Result: ', ESbestResult)
+    '''
+
+    printResults('Exhaustive Search', inputSettings)
 
 
 
@@ -260,7 +276,7 @@ def singleExhuastiveSearch(MIN, MAX, SIMULATIONS_PER_INPUT, inputSettings, input
         else:
             inputSettings[inputType][intersectionIndex] = newInputSetting
 
-        result = simulation.runAdjustedSimulation(inputSettings)
+        result = evaluate(inputSettings)
 
         if result > bestResult:
             bestResultInputSetting = newInputSetting + 0
@@ -273,6 +289,18 @@ def singleExhuastiveSearch(MIN, MAX, SIMULATIONS_PER_INPUT, inputSettings, input
         inputSettings[inputType] = bestResultInputSetting + 0
     else:
         inputSettings[inputType][intersectionIndex] = bestResultInputSetting + 0
+
+    return inputSettings
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -338,93 +366,96 @@ def nelderMeadOneDimension():
 
 
 def singleNelderMead(MIN, MAX, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex):
-    PHASE_DISTRIBUTION_INTIAL_DIFFERENCE = 0.15
-    SIMULATION_BUDGET = 10
+    INITIAL_DIFFERENCE = 3 / 16 * (MAX-MIN)
     REFLECTION_FACTOR = 1
     EXPANSION_FACTOR = 2
     CONTRACTION_FACTOR = 0.5
 
-    point1 = defaultInputSettingsNp + 0
+    point1 = inputSettings + 0
     point2 = point1 + 0 # quick and dirty
-    point2[0][0] -= PHASE_DISTRIBUTION_INTIAL_DIFFERENCE
+
+    initialNrSimulations = simulation.getNrSimulationsRun()
+
+    if intersectionIndex is None:
+        point2[inputType] -= INITIAL_DIFFERENCE
+    else:
+        point2[inputType][intersectionIndex] -= INITIAL_DIFFERENCE
 
     points= [[point1, 0], [point2, 0]]
     for p in points:
-        p[1] = simulation.runAdjustedSimulation(p[0])
+        p[1] = evaluate(p[0])
         sorted(points, key=itemgetter(1))
 
-    nrSimulations = 1
-    while nrSimulations < SIMULATION_BUDGET:
+    while simulation.getNrSimulationsRun() - initialNrSimulations < SIMULATIONS_PER_INPUT:
 
-        print('Points:\t', points)
+        printDebug('Points:\t', points)
 
         x_reflected = [points[0][0] + REFLECTION_FACTOR * (points[0][0] - points[1][0])]
         #print('x-reflected:\t', x_reflected[0])
-        x_reflected.append(simulation.runAdjustedSimulation(x_reflected[0]))
+        x_reflected.append(evaluate(x_reflected[0]))
         #print('x-r-result:\t', x_reflected[1])
 
         if x_reflected[1] > points[0][1]: # new point is best so far
             x_expanded = [points[0][0] + EXPANSION_FACTOR * (x_reflected[0] - points[0][0])]
-            x_expanded.append(simulation.runAdjustedSimulation(x_expanded[0]))
+            x_expanded.append(evaluate(x_expanded[0]))
 
             if x_expanded[1] > x_reflected[1]:
                 points.pop(1)
                 points.insert(0, x_expanded)
-                print('x_expanded:\t\t', x_expanded)
+                printDebug('x_expanded:\t\t', x_expanded)
             else:
                 points.pop(1)
                 points.insert(0, x_reflected)
-                print('x_reflected:\t\t', x_reflected)
+                printDebug('x_reflected:\t\t', x_reflected)
 
         else: # contract
             if  x_reflected[1] > points[1][1]:
                 x_contracted = [points[0][0] + CONTRACTION_FACTOR * (x_reflected[0] - points[0][0])]
-                x_contracted.append(simulation.runAdjustedSimulation(x_contracted[0]))
+                x_contracted.append(evaluate(x_contracted[0]))
                 points.pop(1)
                 points.insert(0, x_contracted)
-                print('x_contracted (to x_reflected):\t\t', x_contracted)
+                printDebug('x_contracted (to x_reflected):\t\t', x_contracted)
             else:
                 x_contracted = [points[0][0] - CONTRACTION_FACTOR * (points[0][0] - points[1][0])]
-                x_contracted.append(simulation.runAdjustedSimulation(x_contracted[0]))
+                x_contracted.append(evaluate(x_contracted[0]))
                 points.pop(1)
                 points.insert(0, x_contracted)
-                print('x_contracted (to x_2):\t\t', x_contracted)
+                printDebug('x_contracted (to x_2):\t\t', x_contracted)
+
+    bestPoint = points[0][0]
+    return bestPoint
 
 
-        nrSimulations += 1
-
-
-def nelderMeadFull():
-    SIMULATION_BUDGET = 40
+def fullNelderMead():
     SIMULATIONS_PER_INPUT = int(round(SIMULATION_BUDGET / getNrInputs(), 0))
 
     inputSettings = defaultInputSettingsNp + 0
 
-    inputsDone = 0
-
     for inputType in range(len(inputSettings)):
         if inputType == 0:      # phase distribution
             for intersectionIndex in range(len(inputSettings[inputType])):
-                singleExhuastiveSearch(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
-                inputsDone += 1
-                printProgress( inputsDone / getNrInputs())
+                inputSettings = singleNelderMead(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
+                printProgressGlobal()
         elif inputType == 1:    # cycle length
-            singleExhuastiveSearch(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, None)
-            inputsDone += 1
-            printProgress(inputsDone / getNrInputs())
+            inputSettings = singleNelderMead(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, None)
+            printProgressGlobal()
         else:                   # offset
             for intersectionIndex in range(len(inputSettings[inputType])):
-                singleExhuastiveSearch(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
-                inputsDone += 1
-                printProgress(inputsDone / getNrInputs())
+                inputSettings = singleNelderMead(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
+                printProgressGlobal()
 
-    printDebug('Exhuastive search completed.\nInputSettings:\n', inputSettings, debugLevel=5)
+    # printDebug('Nelder Mead completed.\nInputSettings:\n', inputSettings, debugLevel=5)
+    printResults('Nelder Mead', inputSettings)
 
 #############################    GENERAL    #############################
 
 def printProgress(percentage):
     printDebug('Optimization is ', round(percentage * 100, 1), ' %...')
 
+
+
+def printProgressGlobal():
+    printProgress(simulation.getNrSimulationsRun() / SIMULATION_BUDGET)
 
 def testResult():
     inputSettings = defaultInputSettings
@@ -467,15 +498,49 @@ def convert0to1toRealWorld(float0to1, MIN, MAX):
     return realValue
 
 
+def testFunction():
+    bestResultLog.append(1)
+
+def evaluate(inputSettings):
+    result = simulation.runAdjustedSimulation(inputSettings)
+    possiblyStoreBestResult(result, inputSettings)
+    return result
+
+def printResults(algorithm, bestInputSettings):
+    print('---------- ' , algorithm, 'results ----------')
+    print('Best solution:  \t', bestInputSettings)
+    print('Result:         \t', bestResultLog[len(bestResultLog) - 1])
+    print('Simulations run:\t', simulation.getNrSimulationsRun())
+    print('Result log:     \t', bestResultLog)
+
+
 
 #############################    MAIN CODE STARTS HERE    #############################
 
 # nelderMeadOneDimension()
 
-singleExhuastiveSearch(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, 10, defaultInputSettingsNp, 0, 0)
-printDebug(ESbestResult)
+# singleExhuastiveSearch(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, 10, defaultInputSettingsNp, 0, 0)
+#printDebug(ESbestResult)
 # print(generateProbablisticInputSettings())
 
-# exhaustiveSearch()
+fullNelderMead()
 
 # geneticAlgorithmController()
+class Optimization:
+
+    def optimizeAndLog(self, algorithm, newSimulationBudget = 40):
+        global bestResultLog
+        global SIMULATION_BUDGET
+
+        bestResultLog = []
+        # SIMULATION_BUDGET = newSimulationBudget
+
+
+        if algorithm == 'Genetic Algorithm':
+            geneticAlgorithmController()
+        elif algorithm == 'Nelder Mead':
+            fullNelderMead()
+        elif algorithm == 'Exhaustive Search':
+            fullExhuastiveSearch()
+
+        return bestResultLog
