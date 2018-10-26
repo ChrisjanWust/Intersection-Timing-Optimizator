@@ -6,6 +6,10 @@ from deap import base, creator
 import random
 from deap import tools
 
+
+
+
+
 MIN_PERIOD = 20
 MAX_PERIOD = 180
 MIN_PHASE_DISTRIBUTION = 0.1
@@ -13,25 +17,33 @@ MAX_PHASE_DISTRIBUTION = 0.9
 MIN_OFFSET = 0
 MAX_OFFSET = MAX_PERIOD - MIN_PERIOD
 
+SEED = 2
+
+SIMULATION_BUDGET = 50
 
 GLOBAL_DEBUG_LEVEL = 3
 DEBUG_PRINT_ON = True
 
-simulation = Simulation()
 
+
+
+
+
+
+
+
+simulation = Simulation()
 simulation.setupSimulation()
 nrIntersections = simulation.getNrIntersections()
-
+random.seed(SEED)
 
 bestResultLog = []
-SIMULATION_BUDGET = 15
 
 defaultInputSettings = {
     'phaseDistributions': [0.5] * nrIntersections,
     'period': 60,
     'offsets': [0] * nrIntersections
 }
-
 
 defaultInputSettingsNp = np.array(
     [
@@ -40,7 +52,6 @@ defaultInputSettingsNp = np.array(
         np.array( [0] * nrIntersections )
     ]
 )
-
 
 
 
@@ -79,7 +90,7 @@ def evaluteGeneticAlgortihm(individual):
 
     result = simulation.runAdjustedSimulation(inputSettings)
 
-    possiblyStoreBestResult(result, inputSettings, individual)
+    possiblyStoreBestResult(result, inputSettings)
 
     return result,
 
@@ -94,6 +105,10 @@ def possiblyStoreBestResult(result, inputSettings):
     if result > GAbestResult:
         GAbestResult = result
         GAbestResultInputSettings = inputSettings + 0
+
+        print('New best found')
+        print('Result: \t', result)
+        print('inputSettings:\n', inputSettings)
 
     bestResultLog.append(GAbestResult)
 
@@ -119,7 +134,7 @@ def setupGeneticAlgorithm():
 
 
 
-def geneticAlgorithmMain():
+def fullGeneticAlgorithm():
     setupGeneticAlgorithm()
 
     global toolbox
@@ -164,9 +179,9 @@ def geneticAlgorithmMain():
 
     return pop
 
-def geneticAlgorithmController():
-    geneticAlgorithmMain()
-    printResults('Genetic Algortihm', GAbestResultInputSettings, GAbestResult)
+def geneticAlgorithmMain():
+    fullGeneticAlgorithm()
+    printResults('Genetic Algortihm', GAbestResultInputSettings)
 
 
 
@@ -354,7 +369,7 @@ def nelderMeadOneDimension():
                 points.insert(0, x_contracted)
                 print('x_contracted (to x_reflected):\t\t', x_contracted)
             else:
-                x_contracted = [points[0][0] - CONTRACTION_FACTOR * (points[0][0] - points[1][0])]
+                x_contracted = [points[0][0] + CONTRACTION_FACTOR * (points[1][0] - points[0][0])]
                 x_contracted.append(simulation.runAdjustedSimulation(x_contracted[0]))
                 points.pop(1)
                 points.insert(0, x_contracted)
@@ -440,33 +455,35 @@ def fullNelderMead():
             inputSettings = singleNelderMead(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, None)
             printProgressGlobal()
         else:                   # offset
-            for intersectionIndex in range(len(inputSettings[inputType])):
-                inputSettings = singleNelderMead(MIN_OFFSET, MAX_OFFSET, SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
+            for intersectionIndex in range(1, len(inputSettings[inputType])):
+                inputSettings = singleNelderMead(MIN_OFFSET, inputSettings[1], SIMULATIONS_PER_INPUT, inputSettings, inputType, intersectionIndex)
                 printProgressGlobal()
 
     # printDebug('Nelder Mead completed.\nInputSettings:\n', inputSettings, debugLevel=5)
     printResults('Nelder Mead', inputSettings)
 
+
+
+
 #############################    GENERAL    #############################
+
 
 def printProgress(percentage):
     printDebug('Optimization is ', round(percentage * 100, 1), ' %...')
 
 
-
 def printProgressGlobal():
     printProgress(simulation.getNrSimulationsRun() / SIMULATION_BUDGET)
 
-def testResult():
-    inputSettings = defaultInputSettings
 
+def testResult(inputSettings):
     result1 = simulation.runAdjustedSimulation(inputSettings)
 
     print (result1)
 
 
 def getNrInputs():
-    return nrIntersections * 2 + 1
+    return nrIntersections * 2 + 1 - 1 # to account for master cycle length and no parameter for last  intersection
 
 
 def printDebug(*arg, debugLevel = 0, end='\n'):
@@ -484,9 +501,11 @@ def convertListToInputSettings(listIn):
                     for i in range(nrIntersections)
                   ]),
         int(round(convert0to1toRealWorld(listIn[nrIntersections], MIN_PERIOD, MAX_PERIOD))),
-        np.array([
+        np.array(
+                  [0] +
+                  [
                     convert0to1toRealWorld(listIn[i], MIN_OFFSET, MAX_OFFSET)
-                    for i in range(nrIntersections + 1, nrIntersections * 2 + 1)
+                    for i in range(nrIntersections + 1, nrIntersections * 2)
                   ])
     ])
 
@@ -520,27 +539,72 @@ def printResults(algorithm, bestInputSettings):
 # nelderMeadOneDimension()
 
 # singleExhuastiveSearch(MIN_PHASE_DISTRIBUTION, MAX_PHASE_DISTRIBUTION, 10, defaultInputSettingsNp, 0, 0)
-#printDebug(ESbestResult)
+# printDebug(ESbestResult)
 # print(generateProbablisticInputSettings())
 
-fullNelderMead()
+# fullNelderMead()
 
-# geneticAlgorithmController()
+#geneticAlgorithmMain()
+
+
+'''
+inputSettingsResult = np.array([
+        np.array([0.54291661, 0.77746478]),
+        129 ,
+        np.array([150.67387661, 132.13265422])
+    ])
+testResult(inputSettingsResult)
+'''
+
 class Optimization:
 
-    def optimizeAndLog(self, algorithm, newSimulationBudget = 40):
+    def optimizeAndLog(self, algorithm, simulationBudget = None):
         global bestResultLog
         global SIMULATION_BUDGET
 
-        bestResultLog = []
-        # SIMULATION_BUDGET = newSimulationBudget
+        if simulationBudget is not None:
+            SIMULATION_BUDGET = simulationBudget
 
+        bestResultLog = []
 
         if algorithm == 'Genetic Algorithm':
-            geneticAlgorithmController()
+            geneticAlgorithmMain()
         elif algorithm == 'Nelder Mead':
             fullNelderMead()
         elif algorithm == 'Exhaustive Search':
             fullExhuastiveSearch()
 
         return bestResultLog
+
+    def testResult(self, inputSettings):
+        testResult(inputSettings)
+
+
+
+
+
+
+
+
+
+
+'''
+inputSettingsResultSolutionProvided = np.array([
+        np.array([ 0.3125,  0.425 ]),
+        65.625,
+        np.array([ 0,   12.3046875 ])
+    ])
+
+inputSettingsResultAltered = np.array([
+        np.array([ 0.38,  0.38 ]),
+        65.625,
+        np.array([ 0,   8.3046875 ])
+    ])
+
+testResult(inputSettingsResultAltered)
+'''
+
+
+
+
+

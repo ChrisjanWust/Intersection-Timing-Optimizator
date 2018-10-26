@@ -5,26 +5,39 @@ from display import Display
 import numpy as np
 
 
+
+
+# debugging
+DEBUG_PRINT_ON = True
+GLOBAL_DEBUG_LEVEL = 3
+DISPLAY_ON = True
+SPEED_IN_KMPERHOUR = True
+
+
+
 # INITIALIZE CONSTANTS
-SPEED_LIMIT = 15 # upper speed limit (m/s)
+SPEED_LIMIT = 60 / 3.6 # upper speed limit (m/s)
 MAX_DECELERATION = 2.5 # (m/s^2)
 ACCELERATION = 0.9 # (m/s^2)
 TIME_STEP = 0.1 # (s)
 START_BREAKING_DISTANCE = 40 # (m)
-INTERSECTION_SPEED = 8
+INTERSECTION_SPEED = 40 / 3.6
 CAR_LENGTH = 6
 MIN_CAR_LENGTH_BETWEEN_CARS = 1.5
 ROAD_WIDTH = 6 # declared in display as well
 
 # CONSTRAINTS
-CONSTRAINTS_ACTIVE = False
+CONSTRAINTS_ACTIVE = True
 MAX_ENTRY_QUEUE = 4
 CHECK_CONSTRAINTS_TIMESTEP = 10
-MAX_VEHICLE_DENSITY = 0.5 # (veh / m) . 0.15 still activates sometimes
+MAX_VEHICLE_DENSITY = .11 # (veh / m) . 0.15 still activates sometimes
+
+#MAX_ENTRY_QUEUE = 4   # absurd amount to prevent from triggering
+#MAX_VEHICLE_DENSITY = 1 # absurd amount to prevent from triggering
 
 
-SCENARIO_NUMBER = 1 # 1, 3 and 5 are well defined
-SEED = 9 # 5 is not bad for 1, 5 is bad for 5
+SCENARIO_NUMBER = 7 # 1, 3 and 5 are well defined # 5: Webster, 7: Logic Test
+SEED = 8 # 5 is not bad for 1, 5 is bad for 5
 SIMULATIONS_PER_CHANGE = 3
 POINTS_SIMULATED = 9
 
@@ -38,11 +51,6 @@ MEASURING_PERIOD = 60 * 5 # (s) = 5 mins
 AVERAGE_NOT_MEDIAN = True
 
 
-# debugging
-DEBUG_PRINT_ON = True
-GLOBAL_DEBUG_LEVEL = 5
-DISPLAY_ON = False
-SPEED_IN_KMPERHOUR = True
 
 
 # initialize public variables
@@ -222,15 +230,17 @@ def runSingleTimestep():
     if time % CHECK_MEAN_SYSTEM_SPEED_TIMESTEP == 0:
         continueSimulation = checkMeanSystemSpeed()
 
-    if CONSTRAINTS_ACTIVE:
-        if time % CHECK_CONSTRAINTS_TIMESTEP == 0:
-            constraintsOk = checkConstraints()
-            if not constraintsOk:
-                setPhaseDistributionLimit()
-            continueSimulation = continueSimulation and constraintsOk
-            print('SIMULATION CONSTRAINT REACHED')
+    if CONSTRAINTS_ACTIVE and time % CHECK_CONSTRAINTS_TIMESTEP == 0:
+        constraintsOk = checkConstraints()
 
-            systemDistanceTravelled = systemDistanceTravelled/10
+        if not constraintsOk:
+            printDebug('CONSTRAINT REACHED HERE!', 5)
+            print('Constraint reached #1')
+            setPhaseDistributionLimit()
+            systemDistanceTravelled = systemDistanceTravelled / 10000
+
+        continueSimulation = continueSimulation and constraintsOk
+
 
     time = round(time + TIME_STEP, 1)
 
@@ -250,6 +260,7 @@ def generateNewCars():
 def checkIndividualSpeedInLinks():
     for car in cars:
         if not car.checkConstraintsOk(time):
+            # print('individual car constraint triggered')
             return False
 
     return True
@@ -291,7 +302,10 @@ def setPhaseDistributionLimit():
 
 
 def checkConstraints():
-    constraintsOk = checkEntryQueueLengths() and checkIndividualSpeedInLinks() and checkCarDensity()
+    constraintsOk = checkEntryQueueLengths() \
+                    and checkCarDensity() \
+                    and checkIndividualSpeedInLinks()
+    # constraintsOk = True
     return constraintsOk
 
 def findNextObstacle(linkIndex, distanceInLink, direction):
@@ -461,9 +475,9 @@ def runAdjustedSimulation(inputSettings):
         # printDebug("meanSpeedsLog: ", meanSystemSpeedLog, "\n", selected=1)
         resetSimulation()
         runSingleSimulation()
-        newMeasuredMeanSystemSpeed = systemDistanceTravelled / systemTimeTravelled
+        newMeasuredMeanSystemSpeed = systemDistanceTravelled / (systemTimeTravelled + 0.00001)
         printDebug("measuredSystemSpeed: ", newMeasuredMeanSystemSpeed, '\n', debugLevel=1)
-        measuredMeanSystemSpeeds.append(systemDistanceTravelled / systemTimeTravelled)
+        measuredMeanSystemSpeeds.append(newMeasuredMeanSystemSpeed)
 
     simulationResult = 0
 
@@ -541,6 +555,13 @@ def runSimulationAndOptimization():
 
 class Simulation:
 
+    '''
+    def __init__(self, displayOn = None):
+        if displayOn is not None:
+            global DISPLAY_ON
+            DISPLAY_ON = displayOn
+    '''
+
     def runAdjustedSimulation(self, inputSettings):
         return runAdjustedSimulation(inputSettings)
 
@@ -556,3 +577,20 @@ class Simulation:
 
 #runMultipleSimulations()
 #runMeasurementSimulations()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

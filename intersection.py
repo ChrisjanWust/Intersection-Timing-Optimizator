@@ -7,6 +7,9 @@ DEBUG_PRINT_ON = False
 DEFAULT_PHASE_DISTRIBUTION = 0.5
 DEFAULT_PERIOD = 60
 
+YELLOW_TIME = 3
+RED_TIME = 2
+
 class Intersection:
     
     # need to add dynamic different timing cycles
@@ -24,13 +27,15 @@ class Intersection:
     #        return "RED"
 
     def getStatus(self, time, direction):
-        timeWithOffset = time + self.offset
-        perUnit = (timeWithOffset % self.period) / self.period
-        self.printDebug("Intersection details at ", timeWithOffset, "s", "\tDirection:", direction, "\tpu:", perUnit)
-        if direction % 2 == 0 and perUnit < self.phaseDistribution:
+        timeWithOffset = time - self.offset
+        timePerUnit = (timeWithOffset % self.period) / self.period
+        self.printDebug("Intersection details at ", timeWithOffset, "s", "\tDirection:", direction, "\tpu:", timePerUnit)
+
+        effectiveRedTimePerUnit = (YELLOW_TIME / 2 + RED_TIME) / self.period
+        if direction % 2 == 0 and timePerUnit < self.phaseDistribution - effectiveRedTimePerUnit:
             self.printDebug('\tTRUE\n')
             return "GREEN"
-        elif direction % 2 == 1 and perUnit > self.phaseDistribution:
+        elif direction % 2 == 1 and self.phaseDistribution < timePerUnit < 1 - effectiveRedTimePerUnit:
             self.printDebug('\tTRUE\n')
             return "GREEN"
         self.printDebug('\tFALSE\n')

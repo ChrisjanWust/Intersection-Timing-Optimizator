@@ -91,10 +91,10 @@ class Car:
                 #        START_BREAKING_DISTANCE - distanceTillNextObject) / START_BREAKING_DISTANCE / START_BREAKING_DISTANCE * 1.3 + self.speed / SPEED_LIMIT * self.speed / SPEED_LIMIT * 1.43) * MAX_DECELERATION * TIME_STEP
 
                 # new deceleration based on first principles / equation of motion
-                if distanceTillNextObject != 0:
-                    deceleration = - (speedOfNextObject * speedOfNextObject - self.speed * self.speed) / ( 2 * (distanceTillNextObject))
+                if distanceTillNextObject <= 0:
+                    deceleration = MAX_DECELERATION * 10 # hacky
                 else:
-                    deceleration = MAX_DECELERATION
+                    deceleration = - (speedOfNextObject * speedOfNextObject - self.speed * self.speed) / ( 2 * (distanceTillNextObject))
                 # self.printDebug('  \tdecelerating at ', round(deceleration,2), 'm/s2')
 
                 # if (deceleration > MAX_DECELERATION): # can remove this test later?
