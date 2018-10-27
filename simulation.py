@@ -10,7 +10,7 @@ import numpy as np
 # debugging
 DEBUG_PRINT_ON = True
 GLOBAL_DEBUG_LEVEL = 3
-DISPLAY_ON = True
+DISPLAY_ON = False
 SPEED_IN_KMPERHOUR = True
 
 
@@ -29,7 +29,7 @@ ROAD_WIDTH = 6 # declared in display as well
 # CONSTRAINTS
 CONSTRAINTS_ACTIVE = True
 MAX_ENTRY_QUEUE = 4
-CHECK_CONSTRAINTS_TIMESTEP = 10
+CHECK_CONSTRAINTS_TIMESTEP = 5
 MAX_VEHICLE_DENSITY = .11 # (veh / m) . 0.15 still activates sometimes
 
 #MAX_ENTRY_QUEUE = 4   # absurd amount to prevent from triggering
@@ -234,10 +234,9 @@ def runSingleTimestep():
         constraintsOk = checkConstraints()
 
         if not constraintsOk:
-            printDebug('CONSTRAINT REACHED HERE!', 5)
-            print('Constraint reached #1')
+            printDebug('CONSTRAINT REACHED', 3)
             setPhaseDistributionLimit()
-            systemDistanceTravelled = systemDistanceTravelled / 10000
+            systemDistanceTravelled = systemDistanceTravelled / 10
 
         continueSimulation = continueSimulation and constraintsOk
 
@@ -562,6 +561,7 @@ class Simulation:
             DISPLAY_ON = displayOn
     '''
 
+
     def runAdjustedSimulation(self, inputSettings):
         return runAdjustedSimulation(inputSettings)
 
@@ -573,6 +573,10 @@ class Simulation:
 
     def getNrSimulationsRun(self):
         return nrSimulationRuns
+
+    def resetNrSimulationsRun(self):
+        global nrSimulationRuns
+        nrSimulationRuns = 0
 
 
 #runMultipleSimulations()

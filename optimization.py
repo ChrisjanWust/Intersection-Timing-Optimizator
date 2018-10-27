@@ -6,9 +6,9 @@ from deap import base, creator
 import random
 from deap import tools
 
-
-
-
+import logging
+import matplotlib.pyplot as plt
+import time
 
 MIN_PERIOD = 20
 MAX_PERIOD = 180
@@ -17,15 +17,15 @@ MAX_PHASE_DISTRIBUTION = 0.9
 MIN_OFFSET = 0
 MAX_OFFSET = MAX_PERIOD - MIN_PERIOD
 
-SEED = 7 # seed 2 is currently bad for scenario 7
+SEED = 9 # was 7 # seed 2 is currently bad for scenario 7
 
-SIMULATION_BUDGET = 50
+SIMULATION_BUDGET = 100
 
 GLOBAL_DEBUG_LEVEL = 3
+GLOBAL_DEBUG_LOGGING_LEVEL = 4
 DEBUG_PRINT_ON = True
-
-
-
+DEBUG_LOG_ON = True
+ROOT_FOLDER = 'results/'
 
 
 
@@ -37,7 +37,11 @@ simulation.setupSimulation()
 nrIntersections = simulation.getNrIntersections()
 random.seed(SEED)
 
+
 bestResultLog = []
+bestResult = -1
+bestInputSettings = -1
+
 
 defaultInputSettings = {
     'phaseDistributions': [0.5] * nrIntersections,
@@ -56,18 +60,14 @@ defaultInputSettingsNp = np.array(
 
 
 
-
+nextFigureFileName = 'a'
 
 
 
 #############################    GENETIC ALGORTIHM NEW, USING DEAP   #############################
 toolbox = base.Toolbox()
 
-GAbestResult = -1
-GAbestResultInputSettings = -1
-GAbestResultList = []
-
-GA_POPULATION = 6
+GA_POPULATION = 8
 
 # gaussian mutation
 MUTATION_MU = 0.5
@@ -78,11 +78,13 @@ POLYNOMIAL_ETA = 0.5
 POLYNOMIAL_LOW = 0
 POLYNOMIAL_HIGH = 1
 
-MUTATION_PROBABILITY = 0.2
-CROSSOVER_PROBABILITY = 0.5
+MUTATION_PROBABILITY = 0.5 # was 0.2
+CROSSOVER_PROBABILITY = 0.8 # was 0.5
 
-SINGLE_ELEMENT_MUTATION_PROBABILITY = 0.4 # WAS 0.1
-SINGLE_ELEMENT_CROSSOVER_PROBABILITY = 0.5
+SINGLE_ELEMENT_MUTATION_PROBABILITY = 0.1 # was 0.4 # WAS 0.1
+SINGLE_ELEMENT_CROSSOVER_PROBABILITY = 0.3 # was 0.5
+
+PERCENTAGE_SELECTED = 0.5
 
 
 def evaluteGeneticAlgortihm(individual):
@@ -93,24 +95,6 @@ def evaluteGeneticAlgortihm(individual):
     possiblyStoreBestResult(result, inputSettings)
 
     return result,
-
-
-
-
-def possiblyStoreBestResult(result, inputSettings):
-    global GAbestResult
-    global GAbestResultInputSettings
-    global bestResultLog
-
-    if result > GAbestResult:
-        GAbestResult = result
-        GAbestResultInputSettings = inputSettings + 0
-
-        print('New best found')
-        print('Result: \t', result)
-        print('inputSettings:\n', inputSettings)
-
-    bestResultLog.append(GAbestResult)
 
 
 
@@ -129,7 +113,7 @@ def setupGeneticAlgorithm():
     toolbox.register("mate", tools.cxUniform, indpb = SINGLE_ELEMENT_CROSSOVER_PROBABILITY)
     #toolbox.register("mutate", tools.mutGaussian, mu=MUTATION_MU, sigma=MUTATION_SIGMA, indpb=SINGLE_ELEMENT_MUTATION_PROBABILITY)
     toolbox.register("mutate", tools.mutPolynomialBounded, eta = POLYNOMIAL_ETA, low = POLYNOMIAL_LOW, up = POLYNOMIAL_HIGH, indpb = MUTATION_PROBABILITY)
-    toolbox.register("select", tools.selTournament, tournsize=3)
+    toolbox.register("select", tools.selBest, k= int(round(PERCENTAGE_SELECTED * GA_POPULATION)))
     toolbox.register("evaluate", evaluteGeneticAlgortihm)
 
 
@@ -152,7 +136,7 @@ def fullGeneticAlgorithm():
         printDebug('Generation ', g, end='\t\t')
         printProgress(simulation.getNrSimulationsRun() / SIMULATION_BUDGET)
         # Select the next generation individuals
-        offspring = toolbox.select(pop, len(pop))
+        offspring = toolbox.select(pop)
         # Clone the selected individuals
         offspring = list(map(toolbox.clone, offspring))
 
@@ -181,7 +165,7 @@ def fullGeneticAlgorithm():
 
 def geneticAlgorithmMain():
     fullGeneticAlgorithm()
-    printResults('Genetic Algortihm', GAbestResultInputSettings)
+    printResults('Genetic Algortihm', bestInputSettings)
 
 
 
@@ -491,6 +475,12 @@ def printDebug(*arg, debugLevel = 0, end='\n'):
         for msg in arg:
             print (msg, end='')
         print(end=end)
+    if DEBUG_LOG_ON and debugLevel >= GLOBAL_DEBUG_LOGGING_LEVEL:
+        fullMessage = ''
+        for msg in arg:
+            fullMessage+= str(msg)
+        logging.info(fullMessage)
+
 
 
 
@@ -517,20 +507,46 @@ def convert0to1toRealWorld(float0to1, MIN, MAX):
     return realValue
 
 
-def testFunction():
-    bestResultLog.append(1)
-
 def evaluate(inputSettings):
     result = simulation.runAdjustedSimulation(inputSettings)
     possiblyStoreBestResult(result, inputSettings)
     return result
 
-def printResults(algorithm, bestInputSettings):
-    print('---------- ' , algorithm, 'results ----------')
-    print('Best solution:  \t', bestInputSettings)
-    print('Result:         \t', bestResultLog[len(bestResultLog) - 1])
-    print('Simulations run:\t', simulation.getNrSimulationsRun())
-    print('Result log:     \t', bestResultLog)
+
+def possiblyStoreBestResult(result, inputSettings):
+    global bestResult
+    global bestInputSettings
+    global bestResultLog
+
+    if result > bestResult:
+        bestResult = result
+        bestInputSettings = inputSettings + 0
+
+        printDebug('New best found', debugLevel=3)
+        printDebug('Result: \t', result, debugLevel=3)
+        printDebug('inputSettings:\n', inputSettings,debugLevel=3)
+
+    bestResultLog.append(bestResult)
+
+
+def printResults(algorithm, a=None):
+    printDebug('---------- ' , algorithm, 'results ----------', debugLevel=10)
+    printDebug('Best solution:  \t', bestInputSettings, debugLevel=10)
+    printDebug('Result:         \t', bestResultLog[len(bestResultLog) - 1], debugLevel=10)
+    printDebug('Simulations run:\t', simulation.getNrSimulationsRun(), debugLevel=10)
+    printDebug('Result log:     \t', bestResultLog, debugLevel=10)
+
+
+def saveFigure(title, fileName):
+    plt.xlabel('Simulations run')
+    plt.ylabel('MSS (m/s)')
+    plt.title(title)
+    # plt.figure(dpi=1200)
+    # plt.show()
+    plt.savefig(ROOT_FOLDER + fileName + '.png', dpi=300)
+
+def plot(log):
+    plt.plot(log)
 
 
 
@@ -558,26 +574,57 @@ testResult(inputSettingsResult)
 
 class Optimization:
 
-    def optimizeAndLog(self, algorithm, simulationBudget = None):
+    def __init__(self, title ='ALL'):
+        global fileNameStart
+        fileNameStart = time.strftime("%a %Hh%Mm") + ' - ' + title
+        logging.basicConfig(filename=ROOT_FOLDER + fileNameStart + '.txt', level=logging.DEBUG, format='%(message)s')
+
+    def optimizeAndLog(self, algorithm, simulationBudget = None, seed=None, relativeSeed=None):
         global bestResultLog
         global SIMULATION_BUDGET
 
+        # setup
         if simulationBudget is not None:
             SIMULATION_BUDGET = simulationBudget
+        if seed is not None:
+            random.seed(seed)
+        if relativeSeed is not None:
+            random.seed(SEED + relativeSeed)
 
         bestResultLog = []
+        simulation.resetNrSimulationsRun()
+
+        logging.info(' ------ ' + algorithm + ' ------ ' )
 
         if algorithm == 'Genetic Algorithm':
             geneticAlgorithmMain()
-        elif algorithm == 'Nelder Mead':
+        elif algorithm == 'Nelder-Mead':
             fullNelderMead()
         elif algorithm == 'Exhaustive Search':
             fullExhuastiveSearch()
 
+        plt.plot(bestResultLog)
+
         return bestResultLog
+
+
+    def saveFigure(self, title):
+        plt.xlabel('Simulations run')
+        plt.ylabel('MSS (m/s)')
+        plt.title(title)
+        plt.savefig(ROOT_FOLDER + fileNameStart + ' - ' + title + '.png', dpi=300)
 
     def testResult(self, inputSettings):
         testResult(inputSettings)
+
+    def reset(self):
+        global bestResultLog
+        global bestResult
+        global bestInputSettings
+
+        bestResult = 0
+        bestInputSettings = []
+        bestResultLog = []
 
 
 
