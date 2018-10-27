@@ -551,13 +551,13 @@ def plot(log):
 def beautifyLog():
     global bestResultLog
 
-    printDebug('\n\n', 'bestResultLog len: ',len(bestResultLog), 'budg: ', SIMULATION_BUDGET, '\n\n', debugLevel=6)
-    for i in range(len(bestResultLog), SIMULATION_BUDGET):
+    #printDebug('\n\n', 'bestResultLog len: ',len(bestResultLog), 'budg: ', SIMULATION_BUDGET, '\n\n', debugLevel=6)
+    for i in range(len(bestResultLog), SIMULATION_BUDGET  +1):
         lastResult = bestResultLog[len(bestResultLog) -1]
         bestResultLog.append(lastResult)
 
-    printDebug('\n\n', 'bestResultLog len: ',len(bestResultLog), 'budg: ', SIMULATION_BUDGET, '\n\n', debugLevel=6)
-    for i in range(SIMULATION_BUDGET, len(bestResultLog)):
+    #printDebug('\n\n', 'bestResultLog len: ',len(bestResultLog), 'budg: ', SIMULATION_BUDGET, '\n\n', debugLevel=6)
+    for i in range(SIMULATION_BUDGET + 1, len(bestResultLog)):
         bestResultLog.pop()
 
 #############################    MAIN CODE STARTS HERE    #############################
