@@ -19,7 +19,7 @@ MAX_OFFSET = MAX_PERIOD - MIN_PERIOD
 
 SEED = 9 # was 7 # seed 2 is currently bad for scenario 7
 
-SIMULATION_BUDGET = 10
+SIMULATION_BUDGET = 3
 
 GLOBAL_DEBUG_LEVEL = 3
 GLOBAL_DEBUG_LOGGING_LEVEL = 4
@@ -43,6 +43,9 @@ bestResult = -1
 bestInputSettings = -1
 
 
+allLogs = [[]]
+logsLabels = []
+
 defaultInputSettings = {
     'phaseDistributions': [0.5] * nrIntersections,
     'period': 60,
@@ -57,10 +60,6 @@ defaultInputSettingsNp = np.array(
     ]
 )
 
-
-
-
-nextFigureFileName = 'a'
 
 
 
@@ -560,6 +559,17 @@ def beautifyLog():
     for i in range(SIMULATION_BUDGET + 1, len(bestResultLog)):
         bestResultLog.pop()
 
+
+def logsSaveForAverage(log):
+    global allLogs
+
+    allLogs[len(allLogs) - 1].append(np.array(log))
+
+def logsNewColumn():
+    global allLogs
+    allLogs.append([])
+
+
 #############################    MAIN CODE STARTS HERE    #############################
 
 # nelderMeadOneDimension()
@@ -586,8 +596,12 @@ class Optimization:
 
     def __init__(self, title ='ALL'):
         global fileNameStart
+
         fileNameStart = time.strftime("%a %Hh%Mm") + ' - ' + title
         logging.basicConfig(filename=ROOT_FOLDER + fileNameStart + '.txt', level=logging.DEBUG, format='%(message)s')
+
+        plt.rc('font', **{'family': 'serif', 'serif': ['Georgia']})
+        plt.rc('text', usetex=True)
 
     def optimizeAndLog(self, algorithm, simulationBudget = None, simulationSeed=None, optimizationSeed=None):
         global bestResultLog
@@ -617,15 +631,22 @@ class Optimization:
 
         plt.plot(bestResultLog)
 
+        logsSaveForAverage(bestResultLog)
+
         return bestResultLog
 
 
-    def saveFigure(self, title):
+    def saveFigure(self, title, scenario):
         plt.xlabel('Simulations run')
         plt.ylabel('MSS (m/s)')
-        plt.title(title)
+        plt.title(title + ' - ' + scenario)
         plt.savefig(ROOT_FOLDER + fileNameStart + ' - ' + title + '.png', dpi=300)
         plt.clf()
+
+        logsNewColumn()
+
+        global logsLabels
+        logsLabels.append(title)
 
     def testResult(self, inputSettings):
         testResult(inputSettings)
@@ -638,6 +659,25 @@ class Optimization:
         bestResult = 0
         bestInputSettings = []
         bestResultLog = []
+
+    def saveAverageFigure(self, title):
+        printDebug('ALL LOGS\n', allLogs, debugLevel=3)
+        printDebug('LABELS\n', logsLabels, debugLevel=3)
+
+        i = 0
+        for log in allLogs:
+            if len(log) != 0:
+                averageLog = sum(log) / len(log)
+                plt.plot(averageLog, label=str(logsLabels[i]))
+                i+=1
+
+
+        lgd = plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0., frameon=False)
+        plt.xlabel('Simulations run')
+        plt.ylabel('MSS (m/s)')
+        plt.title(title)
+        plt.savefig(ROOT_FOLDER + fileNameStart + ' - ' + title + '.png', dpi=300, bbox_extra_artists=(lgd,), bbox_inches='tight')
+        plt.clf()
 
 
 

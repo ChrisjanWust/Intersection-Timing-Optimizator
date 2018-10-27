@@ -1,8 +1,4 @@
-import optimization
+from optimization import Optimization
 
-SIMULATION_BUDGET = 4
-bestResultLog = [1,2,3,4,5]
-
-beautifyLog()
-
-print(bestResultLog)
+optimization = Optimization('title')
+optimization.saveAverageFigure('asdf')
