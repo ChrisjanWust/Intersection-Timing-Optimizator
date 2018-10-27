@@ -36,7 +36,7 @@ MAX_VEHICLE_DENSITY = .11 # (veh / m) . 0.15 still activates sometimes
 #MAX_VEHICLE_DENSITY = 1 # absurd amount to prevent from triggering
 
 
-SCENARIO_NUMBER = 7 # 1, 3 and 5 are well defined # 5: Webster, 7: Logic Test
+SCENARIO_NUMBER = 1 # 1, 3 and 5 are well defined # 5: Webster, 7: Logic Test
 SEED = 8 # 5 is not bad for 1, 5 is bad for 5
 SIMULATIONS_PER_CHANGE = 3
 POINTS_SIMULATED = 9
@@ -577,6 +577,10 @@ class Simulation:
     def resetNrSimulationsRun(self):
         global nrSimulationRuns
         nrSimulationRuns = 0
+
+    def seed(self, seed):
+        global SEED
+        SEED = seed
 
 
 #runMultipleSimulations()

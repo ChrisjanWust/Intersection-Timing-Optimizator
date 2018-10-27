@@ -19,7 +19,7 @@ MAX_OFFSET = MAX_PERIOD - MIN_PERIOD
 
 SEED = 9 # was 7 # seed 2 is currently bad for scenario 7
 
-SIMULATION_BUDGET = 100
+SIMULATION_BUDGET = 10
 
 GLOBAL_DEBUG_LEVEL = 3
 GLOBAL_DEBUG_LOGGING_LEVEL = 4
@@ -530,7 +530,7 @@ def possiblyStoreBestResult(result, inputSettings):
 
 
 def printResults(algorithm, a=None):
-    printDebug('---------- ' , algorithm, 'results ----------', debugLevel=10)
+    printDebug('---------- ' , algorithm, ' results ----------', debugLevel=10)
     printDebug('Best solution:  \t', bestInputSettings, debugLevel=10)
     printDebug('Result:         \t', bestResultLog[len(bestResultLog) - 1], debugLevel=10)
     printDebug('Simulations run:\t', simulation.getNrSimulationsRun(), debugLevel=10)
@@ -548,7 +548,17 @@ def saveFigure(title, fileName):
 def plot(log):
     plt.plot(log)
 
+def beautifyLog():
+    global bestResultLog
 
+    printDebug('\n\n', 'bestResultLog len: ',len(bestResultLog), 'budg: ', SIMULATION_BUDGET, '\n\n', debugLevel=6)
+    for i in range(len(bestResultLog), SIMULATION_BUDGET):
+        lastResult = bestResultLog[len(bestResultLog) -1]
+        bestResultLog.append(lastResult)
+
+    printDebug('\n\n', 'bestResultLog len: ',len(bestResultLog), 'budg: ', SIMULATION_BUDGET, '\n\n', debugLevel=6)
+    for i in range(SIMULATION_BUDGET, len(bestResultLog)):
+        bestResultLog.pop()
 
 #############################    MAIN CODE STARTS HERE    #############################
 
@@ -579,22 +589,22 @@ class Optimization:
         fileNameStart = time.strftime("%a %Hh%Mm") + ' - ' + title
         logging.basicConfig(filename=ROOT_FOLDER + fileNameStart + '.txt', level=logging.DEBUG, format='%(message)s')
 
-    def optimizeAndLog(self, algorithm, simulationBudget = None, seed=None, relativeSeed=None):
+    def optimizeAndLog(self, algorithm, simulationBudget = None, simulationSeed=None, optimizationSeed=None):
         global bestResultLog
         global SIMULATION_BUDGET
 
         # setup
         if simulationBudget is not None:
             SIMULATION_BUDGET = simulationBudget
-        if seed is not None:
-            random.seed(seed)
-        if relativeSeed is not None:
-            random.seed(SEED + relativeSeed)
+        if simulationSeed is not None:
+            # random.seed(seed)
+            # printDebug('seeding simulation ', simulationSeed, debugLevel=10)
+            simulation.seed(simulationSeed)
+        if optimizationSeed is not None:
+            random.seed(optimizationSeed)
 
-        bestResultLog = []
+        bestResultLog = [0]
         simulation.resetNrSimulationsRun()
-
-        logging.info(' ------ ' + algorithm + ' ------ ' )
 
         if algorithm == 'Genetic Algorithm':
             geneticAlgorithmMain()
@@ -602,6 +612,8 @@ class Optimization:
             fullNelderMead()
         elif algorithm == 'Exhaustive Search':
             fullExhuastiveSearch()
+
+        beautifyLog()
 
         plt.plot(bestResultLog)
 
@@ -613,6 +625,7 @@ class Optimization:
         plt.ylabel('MSS (m/s)')
         plt.title(title)
         plt.savefig(ROOT_FOLDER + fileNameStart + ' - ' + title + '.png', dpi=300)
+        plt.clf()
 
     def testResult(self, inputSettings):
         testResult(inputSettings)
@@ -625,9 +638,6 @@ class Optimization:
         bestResult = 0
         bestInputSettings = []
         bestResultLog = []
-
-
-
 
 
 
